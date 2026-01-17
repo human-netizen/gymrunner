@@ -55,4 +55,24 @@ class SettingsRepository {
     await (_db.update(_db.settings)..where((tbl) => tbl.id.equals(settings.id)))
         .write(SettingsCompanion(plateInventoryCsv: drift.Value(csv)));
   }
+
+  Future<void> updateBackupAutoEnabled(bool enabled) async {
+    final settings = await ensureSingleRow();
+    await (_db.update(_db.settings)..where((tbl) => tbl.id.equals(settings.id)))
+        .write(SettingsCompanion(backupAutoEnabled: drift.Value(enabled)));
+  }
+
+  Future<void> updateBackupEncryptionEnabled(bool enabled) async {
+    final settings = await ensureSingleRow();
+    await (_db.update(_db.settings)..where((tbl) => tbl.id.equals(settings.id)))
+        .write(
+      SettingsCompanion(backupEncryptionEnabled: drift.Value(enabled)),
+    );
+  }
+
+  Future<void> updateLastAutoBackupAt(DateTime? value) async {
+    final settings = await ensureSingleRow();
+    await (_db.update(_db.settings)..where((tbl) => tbl.id.equals(settings.id)))
+        .write(SettingsCompanion(lastAutoBackupAt: drift.Value(value)));
+  }
 }

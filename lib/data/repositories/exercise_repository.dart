@@ -15,6 +15,13 @@ class ExerciseRepository {
     return query.watch();
   }
 
+  Stream<Exercise?> watchExerciseById(int id) {
+    final query = _db.select(_db.exercises)
+      ..where((tbl) => tbl.id.equals(id))
+      ..limit(1);
+    return query.watchSingleOrNull();
+  }
+
   Future<int?> createExercise({
     required String name,
     required String primaryMuscle,

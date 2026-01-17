@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../data/providers.dart';
 import '../../data/repositories/session_repository.dart';
+import '../../services/session_share_service.dart';
 
 class SessionDetailScreen extends ConsumerWidget {
   const SessionDetailScreen({super.key, required this.sessionId});
@@ -14,7 +16,16 @@ class SessionDetailScreen extends ConsumerWidget {
     final detailsAsync = ref.watch(sessionDetailsProvider(sessionId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Session Details')),
+      appBar: AppBar(
+        title: const Text('Session Details'),
+        actions: [
+          IconButton(
+            onPressed: () => _shareSession(context, ref),
+            icon: const Icon(Icons.share),
+            tooltip: 'Share summary',
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: detailsAsync.when(
@@ -48,6 +59,22 @@ class SessionDetailScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _shareSession(BuildContext context, WidgetRef ref) async {
+    try {
+      final text = await ref
+          .read(sessionShareServiceProvider)
+          .buildSessionSummaryText(sessionId);
+      await Share.share(text, subject: 'Workout Summary');
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Share failed: $error')),
+      );
+    }
   }
 }
 

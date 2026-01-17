@@ -774,6 +774,32 @@ class SessionRepository {
     }
     return rows[index + 1].id;
   }
+
+  Future<int?> getPreviousSessionExerciseId(
+    int sessionId,
+    int currentSessionExerciseId,
+  ) async {
+    final rows = await (_db.select(_db.sessionExercises)
+          ..where((tbl) => tbl.sessionId.equals(sessionId))
+          ..orderBy([
+            (tbl) => drift.OrderingTerm(expression: tbl.orderIndex),
+          ]))
+        .get();
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final index =
+        rows.indexWhere((row) => row.id == currentSessionExerciseId);
+    if (index == -1) {
+      return null;
+    }
+    if (index - 1 < 0) {
+      return null;
+    }
+    return rows[index - 1].id;
+  }
 }
 
 class _SessionExerciseGroup {

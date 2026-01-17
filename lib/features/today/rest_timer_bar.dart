@@ -23,25 +23,30 @@ class RestTimerBar extends ConsumerWidget {
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              'Rest: $minutes:$seconds',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+          Text(
+            'Rest: $minutes:$seconds',
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-          TextButton(
-            onPressed: notifier.togglePause,
-            child: Text(timerState.isRunning ? 'Pause' : 'Resume'),
-          ),
-          TextButton(
-            onPressed: notifier.reset,
-            child: const Text('Reset'),
-          ),
-          TextButton(
-            onPressed: () => notifier.addSeconds(30),
-            child: const Text('+30s'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton(
+                onPressed: notifier.togglePause,
+                child: Text(timerState.isRunning ? 'Pause' : 'Resume'),
+              ),
+              TextButton(
+                onPressed: notifier.reset,
+                child: const Text('Reset'),
+              ),
+              TextButton(
+                onPressed: () => notifier.addSeconds(30),
+                child: const Text('+30s'),
+              ),
+            ],
           ),
         ],
       ),

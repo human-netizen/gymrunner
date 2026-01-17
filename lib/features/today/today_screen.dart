@@ -18,8 +18,18 @@ class TodayScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(24),
         child: bundleAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => const Center(
-            child: Text('Failed to load session state.'),
+          error: (error, stack) => Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Error: $error'),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: () => ref.invalidate(activeSessionBundleProvider),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
           data: (bundle) {
             if (bundle != null) {

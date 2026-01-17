@@ -27,6 +27,7 @@ class ReviewSummary {
     required this.totalDuration,
     required this.muscleSummary,
     required this.exerciseHighlights,
+    required this.topE1rmSets,
   });
 
   final int sessionsCompleted;
@@ -35,6 +36,7 @@ class ReviewSummary {
   final Duration totalDuration;
   final List<MuscleSummary> muscleSummary;
   final List<ExerciseHighlight> exerciseHighlights;
+  final List<TopE1rmSet> topE1rmSets;
 }
 
 class MuscleSummary {
@@ -63,6 +65,24 @@ class ExerciseHighlight {
   final double volume;
   final double bestWeightKg;
   final int bestReps;
+}
+
+class TopE1rmSet {
+  const TopE1rmSet({
+    required this.exerciseId,
+    required this.exerciseName,
+    required this.e1rm,
+    required this.weightKg,
+    required this.reps,
+    required this.date,
+  });
+
+  final int exerciseId;
+  final String exerciseName;
+  final double e1rm;
+  final double weightKg;
+  final int reps;
+  final DateTime date;
 }
 
 class ReviewRepository {
@@ -136,9 +156,11 @@ class ReviewRepository {
     final exerciseVolume = <int, double>{};
     final exerciseName = <int, String>{};
     final bestSetByExercise = <int, SetLog>{};
+    final topE1rmSets = <TopE1rmSet>[];
 
     for (final row in sets) {
       final volume = row.setLog.weightKg * row.setLog.reps;
+      final e1rm = _estimate1rm(row.setLog.weightKg, row.setLog.reps);
       totalVolume += volume;
 
       final primary = row.exercise.primaryMuscle;
@@ -156,6 +178,17 @@ class ReviewRepository {
               row.setLog.reps > currentBest.reps)) {
         bestSetByExercise[id] = row.setLog;
       }
+
+      topE1rmSets.add(
+        TopE1rmSet(
+          exerciseId: id,
+          exerciseName: row.exercise.name,
+          e1rm: e1rm,
+          weightKg: row.setLog.weightKg,
+          reps: row.setLog.reps,
+          date: row.session.finishedAt ?? row.session.startedAt,
+        ),
+      );
     }
 
     final muscleSummary = muscleCounts.entries
@@ -182,6 +215,9 @@ class ReviewRepository {
         .toList()
       ..sort((a, b) => b.volume.compareTo(a.volume));
 
+    final topE1rm = [...topE1rmSets]
+      ..sort((a, b) => b.e1rm.compareTo(a.e1rm));
+
     return ReviewSummary(
       sessionsCompleted: sessionsById.length,
       totalWorkingSets: totalWorkingSets,
@@ -189,7 +225,15 @@ class ReviewRepository {
       totalDuration: totalDuration,
       muscleSummary: muscleSummary.take(5).toList(),
       exerciseHighlights: exerciseHighlights.take(5).toList(),
+      topE1rmSets: topE1rm.take(5).toList(),
     );
+  }
+
+  double _estimate1rm(double weight, int reps) {
+    if (reps <= 1) {
+      return weight;
+    }
+    return weight * (1 + reps / 30.0);
   }
 }
 

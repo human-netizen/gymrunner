@@ -7,21 +7,26 @@ class RestTimerState {
     required this.initialSeconds,
     required this.remainingSeconds,
     required this.isRunning,
+    required this.endsAt,
   });
 
   final int initialSeconds;
   final int remainingSeconds;
   final bool isRunning;
+  final DateTime? endsAt;
 
   RestTimerState copyWith({
     int? initialSeconds,
     int? remainingSeconds,
     bool? isRunning,
+    DateTime? endsAt,
+    bool clearEndsAt = false,
   }) {
     return RestTimerState(
       initialSeconds: initialSeconds ?? this.initialSeconds,
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
       isRunning: isRunning ?? this.isRunning,
+      endsAt: clearEndsAt ? null : (endsAt ?? this.endsAt),
     );
   }
 }
@@ -34,6 +39,7 @@ class RestTimerNotifier extends Notifier<RestTimerState> {
       initialSeconds: 0,
       remainingSeconds: 0,
       isRunning: false,
+      endsAt: null,
     );
   }
 
@@ -44,10 +50,12 @@ class RestTimerNotifier extends Notifier<RestTimerState> {
       return;
     }
     _timer?.cancel();
+    final endsAt = DateTime.now().add(Duration(seconds: seconds));
     state = RestTimerState(
       initialSeconds: seconds,
       remainingSeconds: seconds,
       isRunning: true,
+      endsAt: endsAt,
     );
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
@@ -56,7 +64,11 @@ class RestTimerNotifier extends Notifier<RestTimerState> {
     final nextRemaining = state.remainingSeconds - 1;
     if (nextRemaining <= 0) {
       _timer?.cancel();
-      state = state.copyWith(remainingSeconds: 0, isRunning: false);
+      state = state.copyWith(
+        remainingSeconds: 0,
+        isRunning: false,
+        clearEndsAt: true,
+      );
       return;
     }
     state = state.copyWith(remainingSeconds: nextRemaining);
@@ -65,7 +77,7 @@ class RestTimerNotifier extends Notifier<RestTimerState> {
   void togglePause() {
     if (state.isRunning) {
       _timer?.cancel();
-      state = state.copyWith(isRunning: false);
+      state = state.copyWith(isRunning: false, clearEndsAt: true);
       return;
     }
 
@@ -73,7 +85,9 @@ class RestTimerNotifier extends Notifier<RestTimerState> {
       return;
     }
     _timer?.cancel();
-    state = state.copyWith(isRunning: true);
+    final endsAt =
+        DateTime.now().add(Duration(seconds: state.remainingSeconds));
+    state = state.copyWith(isRunning: true, endsAt: endsAt);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
 
@@ -82,6 +96,7 @@ class RestTimerNotifier extends Notifier<RestTimerState> {
     state = state.copyWith(
       remainingSeconds: state.initialSeconds,
       isRunning: false,
+      clearEndsAt: true,
     );
   }
 
@@ -89,10 +104,15 @@ class RestTimerNotifier extends Notifier<RestTimerState> {
     if (seconds <= 0) {
       return;
     }
+    final nextRemaining = state.remainingSeconds + seconds;
     state = state.copyWith(
       initialSeconds: state.initialSeconds + seconds,
-      remainingSeconds: state.remainingSeconds + seconds,
+      remainingSeconds: nextRemaining,
     );
+    if (state.isRunning) {
+      final endsAt = DateTime.now().add(Duration(seconds: nextRemaining));
+      state = state.copyWith(endsAt: endsAt);
+    }
   }
 }
 

@@ -25,6 +25,13 @@ class WorkoutOverviewScreen extends ConsumerWidget {
     final resumeId = session.currentSessionExerciseId;
     final canResume = resumeId != null &&
         exercises.any((exercise) => exercise.sessionExerciseId == resumeId);
+    SessionExerciseSummary? firstIncomplete;
+    for (final exercise in exercises) {
+      if (!exercise.isCompleted) {
+        firstIncomplete = exercise;
+        break;
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,10 +62,37 @@ class WorkoutOverviewScreen extends ConsumerWidget {
                 context.push('/today/runner/${session.currentSessionExerciseId}'),
             child: const Text('Resume'),
           ),
-        if (canResume) const SizedBox(height: 16),
+        if (canResume) const SizedBox(height: 12),
+        if (firstIncomplete != null)
+          Builder(
+            builder: (context) {
+              final target = firstIncomplete;
+              if (target == null) {
+                return const SizedBox.shrink();
+              }
+              return OutlinedButton(
+                onPressed: () =>
+                    context.push('/today/runner/${target.sessionExerciseId}'),
+                child: const Text('Jump to first incomplete'),
+              );
+            },
+          ),
+        if (canResume || firstIncomplete != null) const SizedBox(height: 16),
         Expanded(
           child: exercises.isEmpty
-              ? const Center(child: Text('No exercises in this session.'))
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('No exercises for today.'),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: () => context.go('/programs'),
+                        child: const Text('Go to Programs'),
+                      ),
+                    ],
+                  ),
+                )
               : ListView.separated(
                   itemCount: exercises.length,
                   separatorBuilder: (_, _) => const Divider(height: 1),

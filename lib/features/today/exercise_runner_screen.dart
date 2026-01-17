@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,7 +8,9 @@ import '../../data/providers.dart';
 import '../../data/strength_utils.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../state/rest_timer.dart';
+import 'gym_mode_provider.dart';
 import 'rest_timer_bar.dart';
+import '../../widgets/exercise_demo_card.dart';
 
 class ExerciseRunnerScreen extends ConsumerStatefulWidget {
   const ExerciseRunnerScreen({
@@ -47,6 +50,14 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
         _userEditedReps = true;
       }
     });
+    ref.listen<RestTimerState>(restTimerProvider, (previous, next) {
+      if (previous == null) {
+        return;
+      }
+      if (previous.remainingSeconds > 0 && next.remainingSeconds == 0) {
+        HapticFeedback.mediumImpact();
+      }
+    });
   }
 
   @override
@@ -64,18 +75,32 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
     final settings = ref.watch(settingsStreamProvider).asData?.value;
     final defaultWeight = settings?.barWeightKg ?? 20.0;
     final timerState = ref.watch(restTimerProvider);
+    final gymMode = ref.watch(gymModeProvider);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    const actionBarHeight = 72.0;
+    final actionBarHeight = gymMode ? 88.0 : 72.0;
     final detail = detailAsync.asData?.value;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(title: const Text('Exercise')),
+      appBar: AppBar(
+        title: const Text('Exercise'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ref.read(gymModeProvider.notifier).toggle();
+            },
+            child: Text(gymMode ? 'Gym Mode On' : 'Gym Mode'),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: detailAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => const Center(
-            child: Text('Failed to load exercise.'),
+          error: (error, stack) => _errorView(
+            error: error,
+            onRetry: () => ref.invalidate(
+              sessionExerciseDetailProvider(widget.sessionExerciseId),
+            ),
           ),
           data: (detail) {
             if (detail == null) {
@@ -107,6 +132,16 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                 : 'Suggested: ${suggestedWeight.toStringAsFixed(1)} kg (based on last session)';
             final hasWarmups =
                 _warmupSets.isNotEmpty || warmupSets.isNotEmpty;
+            final showExtras = !gymMode;
+            final textTheme = Theme.of(context).textTheme;
+            final inputStyle = (gymMode
+                    ? textTheme.headlineSmall
+                    : textTheme.titleLarge)
+                ?.copyWith(fontWeight: FontWeight.w700);
+            final nextSetStyle = (gymMode
+                    ? textTheme.headlineSmall
+                    : textTheme.titleMedium)
+                ?.copyWith(fontWeight: FontWeight.w700);
 
             return ListView(
               controller: _scrollController,
@@ -133,121 +168,163 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                       const Chip(label: Text('Deload')),
                   ],
                 ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Working sets: ${detail.loggedWorkingSetsCount} / ${detail.sessionExercise.setsTarget}',
+                              style: textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Target reps: ${detail.sessionExercise.repMin}-${detail.sessionExercise.repMax}',
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (detail.isTargetReached)
+                        Icon(
+                          Icons.check_circle,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                    ],
+                  ),
+                ),
+                if (showExtras) ...[
+                  const SizedBox(height: 12),
+                  ExerciseDemoCard(exercise: detail.exercise),
+                ],
                 const SizedBox(height: 8),
                 Text('$targetLabel - $restLabel'),
                 const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(child: Text(suggestionText)),
-                    if (suggestedWeight != null)
-                      TextButton(
-                        onPressed: () {
-                          _setWeightText(suggestedWeight);
-                          _userEditedWeight = true;
-                        },
-                        child: const Text('Use'),
-                      ),
-                    if (suggestedWeight != null)
-                      TextButton(
-                        onPressed: () => _showSuggestionWhy(
-                          context,
-                          lastPerformance,
-                          detail,
+                if (showExtras)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(child: Text(suggestionText)),
+                      if (suggestedWeight != null)
+                        TextButton(
+                          onPressed: () {
+                            _setWeightText(suggestedWeight);
+                            _userEditedWeight = true;
+                          },
+                          child: const Text('Use'),
                         ),
-                        child: const Text('Why?'),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Card(
-                  elevation: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Warm-up',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        OutlinedButton(
-                          onPressed: () => _generateWarmups(
+                      if (suggestedWeight != null)
+                        TextButton(
+                          onPressed: () => _showSuggestionWhy(
+                            context,
+                            lastPerformance,
                             detail,
-                            defaultWeight,
-                            suggestedWeight,
                           ),
-                          child: const Text('Generate Warm-up'),
+                          child: const Text('Why?'),
                         ),
-                        if (!hasWarmups)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 8),
-                            child: Text('No warm-up sets yet.'),
-                          ),
-                        if (_warmupSets.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _warmupSets
-                                .map(
-                                  (warmup) => Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          '${warmup.weightKg.toStringAsFixed(1)} kg x ${warmup.reps}',
-                                        ),
-                                      ),
-                                      TextButton(
-                                        onPressed: () => _logWarmup(
-                                          detail.sessionExercise.id,
-                                          warmup,
-                                        ),
-                                        child: const Text('Log'),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ],
-                        if (warmupSets.isNotEmpty) ...[
-                          const SizedBox(height: 8),
+                    ],
+                  ),
+                if (showExtras) const SizedBox(height: 8),
+                if (showExtras)
+                  Card(
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            'Logged warm-up sets',
-                            style: Theme.of(context).textTheme.labelLarge,
+                            'Warm-up',
+                            style: Theme.of(context).textTheme.titleMedium,
                           ),
-                          const SizedBox(height: 4),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: warmupSets
-                                .map(
-                                  (set) => ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text(
-                                      'Warm-up ${set.setIndex}: ${set.weightKg.toStringAsFixed(1)} x ${set.reps}',
+                          const SizedBox(height: 8),
+                          OutlinedButton(
+                            onPressed: () => _generateWarmups(
+                              detail,
+                              defaultWeight,
+                              suggestedWeight,
+                            ),
+                            child: const Text('Generate Warm-up'),
+                          ),
+                          if (!hasWarmups)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 8),
+                              child: Text('No warm-up sets yet.'),
+                            ),
+                          if (_warmupSets.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: _warmupSets
+                                  .map(
+                                    (warmup) => Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '${warmup.weightKg.toStringAsFixed(1)} kg x ${warmup.reps}',
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => _logWarmup(
+                                            detail.sessionExercise.id,
+                                            warmup,
+                                          ),
+                                          child: const Text('Log'),
+                                        ),
+                                      ],
                                     ),
-                                    onTap: () => _showEditSetSheet(set),
-                                  ),
-                                )
-                                .toList(),
-                          ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                          if (warmupSets.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Logged warm-up sets',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: 4),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: warmupSets
+                                  .map(
+                                    (set) => ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text(
+                                        'Warm-up ${set.setIndex}: ${set.weightKg.toStringAsFixed(1)} x ${set.reps}',
+                                      ),
+                                      onTap: () => _showEditSetSheet(set),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  lastPerformanceAsync.when(
-                    data: (performance) =>
-                        performance?.toSummaryLine() ?? 'No history yet',
-                    loading: () => 'Loading history...',
-                    error: (error, stack) => 'No history yet',
+                if (showExtras) const SizedBox(height: 12),
+                if (showExtras)
+                  Text(
+                    lastPerformanceAsync.when(
+                      data: (performance) =>
+                          performance?.toSummaryLine() ?? 'No history yet',
+                      loading: () => 'Loading history...',
+                      error: (error, stack) => 'No history yet',
+                    ),
                   ),
-                ),
                 const SizedBox(height: 16),
-                Text('Next set: $nextSet'),
+                Text(
+                  'Next set: $nextSet',
+                  style: nextSetStyle,
+                ),
                 const SizedBox(height: 8),
                 if (detail.isTargetReached)
                   Text(
@@ -256,29 +333,30 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                           color: Theme.of(context).colorScheme.primary,
                         ),
                   ),
-                const SizedBox(height: 12),
-                Text(
-                  'Working sets',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                if (workingSets.isEmpty)
-                  const Text('No working sets logged yet.')
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: workingSets
-                        .map(
-                          (set) => ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              'Set ${set.setIndex}: ${set.weightKg.toStringAsFixed(1)} x ${set.reps}',
-                            ),
-                            onTap: () => _showEditSetSheet(set),
-                          ),
-                        )
-                        .toList(),
+                if (showExtras) const SizedBox(height: 12),
+                if (showExtras)
+                  Text(
+                    'Working sets',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
+                if (showExtras) const SizedBox(height: 8),
+                if (showExtras)
+                  workingSets.isEmpty
+                      ? const Text('No working sets logged yet.')
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: workingSets
+                              .map(
+                                (set) => ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    'Set ${set.setIndex}: ${set.weightKg.toStringAsFixed(1)} x ${set.reps}',
+                                  ),
+                                  onTap: () => _showEditSetSheet(set),
+                                ),
+                              )
+                              .toList(),
+                        ),
                 const SizedBox(height: 12),
                 Text(
                   'Log next set',
@@ -296,9 +374,15 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                             decoration: const InputDecoration(
                               labelText: 'Weight (kg)',
                             ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
+                            readOnly: true,
+                            showCursor: false,
+                            enableInteractiveSelection: false,
+                            onTap: () => _showWeightPad(
+                              detail,
+                              defaultWeight,
+                              suggestedWeight,
                             ),
+                            style: inputStyle,
                           ),
                           Align(
                             alignment: Alignment.centerLeft,
@@ -308,62 +392,64 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                               child: const Text('Plates'),
                             ),
                           ),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              OutlinedButton(
-                                onPressed: () => _adjustWeight(
-                                  -detail.sessionExercise.incrementKg,
+                          if (showExtras) ...[
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                OutlinedButton(
+                                  onPressed: () => _adjustWeight(
+                                    -detail.sessionExercise.incrementKg,
+                                  ),
+                                  child: Text(
+                                    '-${detail.sessionExercise.incrementKg.toStringAsFixed(1)}',
+                                  ),
                                 ),
-                                child: Text(
-                                  '-${detail.sessionExercise.incrementKg.toStringAsFixed(1)}',
+                                OutlinedButton(
+                                  onPressed: () => _adjustWeight(
+                                    detail.sessionExercise.incrementKg,
+                                  ),
+                                  child: Text(
+                                    '+${detail.sessionExercise.incrementKg.toStringAsFixed(1)}',
+                                  ),
                                 ),
-                              ),
-                              OutlinedButton(
-                                onPressed: () => _adjustWeight(
-                                  detail.sessionExercise.incrementKg,
+                                OutlinedButton(
+                                  onPressed: () => _copyLastWeight(
+                                    detail,
+                                    suggestedWeight,
+                                  ),
+                                  child: const Text('Copy last'),
                                 ),
-                                child: Text(
-                                  '+${detail.sessionExercise.incrementKg.toStringAsFixed(1)}',
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                OutlinedButton(
+                                  onPressed: () => _adjustWeight(2.5),
+                                  child: const Text('+2.5'),
                                 ),
-                              ),
-                              OutlinedButton(
-                                onPressed: () => _copyLastWeight(
-                                  detail,
-                                  suggestedWeight,
+                                OutlinedButton(
+                                  onPressed: () => _adjustWeight(5),
+                                  child: const Text('+5'),
                                 ),
-                                child: const Text('Copy last'),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              OutlinedButton(
-                                onPressed: () => _adjustWeight(2.5),
-                                child: const Text('+2.5'),
-                              ),
-                              OutlinedButton(
-                                onPressed: () => _adjustWeight(5),
-                                child: const Text('+5'),
-                              ),
-                              OutlinedButton(
-                                onPressed: () => _adjustWeight(10),
-                                child: const Text('+10'),
-                              ),
-                              OutlinedButton(
-                                onPressed: () => _adjustWeight(-2.5),
-                                child: const Text('-2.5'),
-                              ),
-                              OutlinedButton(
-                                onPressed: () => _adjustWeight(-5),
-                                child: const Text('-5'),
-                              ),
-                            ],
-                          ),
+                                OutlinedButton(
+                                  onPressed: () => _adjustWeight(10),
+                                  child: const Text('+10'),
+                                ),
+                                OutlinedButton(
+                                  onPressed: () => _adjustWeight(-2.5),
+                                  child: const Text('-2.5'),
+                                ),
+                                OutlinedButton(
+                                  onPressed: () => _adjustWeight(-5),
+                                  child: const Text('-5'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -375,37 +461,43 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                           TextField(
                             controller: _repsController,
                             decoration: const InputDecoration(labelText: 'Reps'),
-                            keyboardType: TextInputType.number,
+                            readOnly: true,
+                            showCursor: false,
+                            enableInteractiveSelection: false,
+                            onTap: () => _showRepsPad(detail),
+                            style: inputStyle,
                           ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              OutlinedButton(
-                                onPressed: () => _adjustReps(
-                                  -1,
-                                  detail.sessionExercise.repMin,
+                          if (showExtras) ...[
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                OutlinedButton(
+                                  onPressed: () => _adjustReps(
+                                    -1,
+                                    detail.sessionExercise.repMin,
+                                  ),
+                                  child: const Text('-1'),
                                 ),
-                                child: const Text('-1'),
-                              ),
-                              OutlinedButton(
-                                onPressed: () => _adjustReps(
-                                  1,
-                                  detail.sessionExercise.repMin,
+                                OutlinedButton(
+                                  onPressed: () => _adjustReps(
+                                    1,
+                                    detail.sessionExercise.repMin,
+                                  ),
+                                  child: const Text('+1'),
                                 ),
-                                child: const Text('+1'),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _repChips(
-                              detail.sessionExercise.repMin,
-                              detail.sessionExercise.repMax,
+                              ],
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _repChips(
+                                detail.sessionExercise.repMin,
+                                detail.sessionExercise.repMax,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -422,6 +514,10 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                           detail.sessionExercise.restSeconds,
                           detail.sessionExercise.repMin,
                         ),
+                        style: FilledButton.styleFrom(
+                          minimumSize:
+                              Size.fromHeight(gymMode ? 56 : 48),
+                        ),
                         child: const Text('Save Set'),
                       ),
                     ),
@@ -431,15 +527,49 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                         onPressed: detail.sets.isEmpty
                             ? null
                             : () => _deleteLastSet(detail.sessionExercise.id),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize:
+                              Size.fromHeight(gymMode ? 56 : 48),
+                        ),
                         child: const Text('Undo Last'),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => _goToPreviousExercise(detail),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize:
+                              Size.fromHeight(gymMode ? 52 : 44),
+                        ),
+                        child: const Text('Previous Exercise'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => _goToNextExercise(detail),
+                        style: FilledButton.styleFrom(
+                          minimumSize:
+                              Size.fromHeight(gymMode ? 52 : 44),
+                        ),
+                        child: const Text('Next Exercise'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 OutlinedButton(
-                  onPressed: () => _goToNextExercise(detail),
-                  child: const Text('Next Exercise'),
+                  onPressed: detail.sessionExercise.restSeconds <= 0
+                      ? null
+                      : () => ref
+                          .read(restTimerProvider.notifier)
+                          .start(detail.sessionExercise.restSeconds),
+                  child: const Text('Start Rest Now'),
                 ),
                 if (timerState.initialSeconds > 0) ...[
                   const SizedBox(height: 12),
@@ -466,6 +596,10 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                           onPressed: () => Navigator.of(context).pop(),
                           icon: const Icon(Icons.arrow_back),
                           label: const Text('Back to Overview'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize:
+                                Size.fromHeight(gymMode ? 56 : 48),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -474,6 +608,10 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                           onPressed: () => _toggleCompletion(
                             detail.sessionExercise.id,
                             !detail.sessionExercise.isCompleted,
+                          ),
+                          style: FilledButton.styleFrom(
+                            minimumSize:
+                                Size.fromHeight(gymMode ? 56 : 48),
                           ),
                           child: Text(
                             detail.sessionExercise.isCompleted
@@ -592,6 +730,291 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
     );
   }
 
+  Future<void> _showWeightPad(
+    SessionExerciseDetail detail,
+    double defaultWeight,
+    double? suggestedWeight,
+  ) async {
+    final current = _weightController.text.trim();
+    final fallbackWeight = suggestedWeight ?? defaultWeight;
+    final initialValue =
+        current.isEmpty ? fallbackWeight.toStringAsFixed(1) : current;
+
+    final result = await _showNumberPad(
+      context: context,
+      title: 'Weight (kg)',
+      initialValue: initialValue,
+      allowDecimal: true,
+      quickControlsBuilder: (setValue, value) {
+        void adjust(double delta) {
+          final currentValue = double.tryParse(value) ?? 0.0;
+          var next = currentValue + delta;
+          if (next < 0) {
+            next = 0;
+          }
+          setValue(next.toStringAsFixed(1));
+        }
+
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton(
+              onPressed: () =>
+                  adjust(-detail.sessionExercise.incrementKg),
+              child: Text(
+                '-${detail.sessionExercise.incrementKg.toStringAsFixed(1)}',
+              ),
+            ),
+            OutlinedButton(
+              onPressed: () => adjust(detail.sessionExercise.incrementKg),
+              child: Text(
+                '+${detail.sessionExercise.incrementKg.toStringAsFixed(1)}',
+              ),
+            ),
+            OutlinedButton(
+              onPressed: () => adjust(2.5),
+              child: const Text('+2.5'),
+            ),
+            OutlinedButton(
+              onPressed: () => adjust(5),
+              child: const Text('+5'),
+            ),
+            OutlinedButton(
+              onPressed: () => adjust(10),
+              child: const Text('+10'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == null) {
+      return;
+    }
+
+    final parsed = double.tryParse(result);
+    if (parsed == null) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid weight.')),
+      );
+      return;
+    }
+    _setWeightText(parsed);
+    _userEditedWeight = true;
+  }
+
+  Future<void> _showRepsPad(SessionExerciseDetail detail) async {
+    final current = _repsController.text.trim();
+    final initialValue =
+        current.isEmpty ? detail.sessionExercise.repMin.toString() : current;
+
+    final result = await _showNumberPad(
+      context: context,
+      title: 'Reps',
+      initialValue: initialValue,
+      allowDecimal: false,
+      quickControlsBuilder: (setValue, value) {
+        void adjust(int delta) {
+          final currentValue =
+              int.tryParse(value) ?? detail.sessionExercise.repMin;
+          var next = currentValue + delta;
+          if (next < 0) {
+            next = 0;
+          }
+          setValue(next.toString());
+        }
+
+        final chips = _repChips(
+          detail.sessionExercise.repMin,
+          detail.sessionExercise.repMax,
+          onTap: (rep) => setValue(rep.toString()),
+        );
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              children: [
+                OutlinedButton(
+                  onPressed: () => adjust(-1),
+                  child: const Text('-1'),
+                ),
+                OutlinedButton(
+                  onPressed: () => adjust(1),
+                  child: const Text('+1'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: chips,
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == null) {
+      return;
+    }
+
+    final parsed = int.tryParse(result);
+    if (parsed == null) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid reps.')),
+      );
+      return;
+    }
+    _setRepsText(parsed);
+    _userEditedReps = true;
+  }
+
+  Future<String?> _showNumberPad({
+    required BuildContext context,
+    required String title,
+    required String initialValue,
+    required bool allowDecimal,
+    required Widget Function(void Function(String), String) quickControlsBuilder,
+  }) async {
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        var value = initialValue;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            void setValue(String next) {
+              setState(() {
+                value = next;
+              });
+            }
+
+            void addChar(String char) {
+              if (char == '.' && !allowDecimal) {
+                return;
+              }
+              if (char == '.' && value.contains('.')) {
+                return;
+              }
+              if (char == '.' && value.isEmpty) {
+                setValue('0.');
+                return;
+              }
+              setValue(value + char);
+            }
+
+            void backspace() {
+              if (value.isEmpty) {
+                return;
+              }
+              setValue(value.substring(0, value.length - 1));
+            }
+
+            final displayValue = value.isEmpty ? '0' : value;
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      displayValue,
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 12),
+                    quickControlsBuilder(setValue, value),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 220,
+                      child: GridView.count(
+                        crossAxisCount: 3,
+                        childAspectRatio: 2,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          for (final digit in [
+                            '1',
+                            '2',
+                            '3',
+                            '4',
+                            '5',
+                            '6',
+                            '7',
+                            '8',
+                            '9',
+                          ])
+                            _NumberPadButton(
+                              label: digit,
+                              onTap: () => addChar(digit),
+                            ),
+                          _NumberPadButton(
+                            label: allowDecimal ? '.' : '',
+                            onTap: allowDecimal ? () => addChar('.') : null,
+                          ),
+                          _NumberPadButton(
+                            label: '0',
+                            onTap: () => addChar('0'),
+                          ),
+                          _NumberPadButton(
+                            label: 'Del',
+                            onTap: backspace,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => setValue(''),
+                            child: const Text('Clear'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () =>
+                                Navigator.of(context).pop(value),
+                            child: const Text('OK'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   double? _parseWeight() {
     return double.tryParse(_weightController.text.trim());
   }
@@ -636,7 +1059,11 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
     _userEditedReps = true;
   }
 
-  List<Widget> _repChips(int repMin, int repMax) {
+  List<Widget> _repChips(
+    int repMin,
+    int repMax, {
+    void Function(int)? onTap,
+  }) {
     if (repMax < repMin) {
       return const [];
     }
@@ -644,6 +1071,10 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
       final value = repMin + index;
       return OutlinedButton(
         onPressed: () {
+          if (onTap != null) {
+            onTap(value);
+            return;
+          }
           _setRepsText(value);
           _userEditedReps = true;
         },
@@ -700,6 +1131,7 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
         .read(sessionRepositoryProvider)
         .addSetReturningLog(sessionExerciseId, weight, reps);
     ref.read(restTimerProvider.notifier).start(restSeconds);
+    HapticFeedback.selectionClick();
 
     if (!mounted) {
       return;
@@ -872,6 +1304,26 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
     context.push('/today/runner/$nextId');
   }
 
+  Future<void> _goToPreviousExercise(SessionExerciseDetail detail) async {
+    final previousId = await ref
+        .read(sessionRepositoryProvider)
+        .getPreviousSessionExerciseId(
+          detail.sessionExercise.sessionId,
+          detail.sessionExercise.id,
+        );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (previousId == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    context.push('/today/runner/$previousId');
+  }
+
   Future<void> _deleteLastSet(int sessionExerciseId) async {
     await ref.read(sessionRepositoryProvider).deleteLastSet(sessionExerciseId);
   }
@@ -880,5 +1332,42 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
     await ref
         .read(sessionRepositoryProvider)
         .toggleExerciseCompleted(sessionExerciseId, done);
+  }
+
+  Widget _errorView({
+    required Object error,
+    required VoidCallback onRetry,
+  }) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Error: $error'),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: onRetry,
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NumberPadButton extends StatelessWidget {
+  const _NumberPadButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(4),
+      child: OutlinedButton(
+        onPressed: onTap,
+        child: Text(label),
+      ),
+    );
   }
 }

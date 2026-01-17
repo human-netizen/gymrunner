@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'db/app_database.dart';
 import 'repositories/exercise_repository.dart';
+import 'repositories/exercise_analytics_repository.dart';
 import 'repositories/prescription_repository.dart';
 import 'repositories/program_repository.dart';
 import 'repositories/review_repository.dart';
@@ -22,6 +23,12 @@ final programRepositoryProvider = Provider<ProgramRepository>((ref) {
 final exerciseRepositoryProvider = Provider<ExerciseRepository>((ref) {
   final db = ref.read(appDatabaseProvider);
   return ExerciseRepository(db);
+});
+
+final exerciseAnalyticsRepositoryProvider =
+    Provider<ExerciseAnalyticsRepository>((ref) {
+  final db = ref.read(appDatabaseProvider);
+  return ExerciseAnalyticsRepository(db);
 });
 
 final prescriptionRepositoryProvider = Provider<PrescriptionRepository>((ref) {
@@ -94,6 +101,34 @@ final exercisesStreamProvider = StreamProvider<List<Exercise>>((ref) {
   final repository = ref.watch(exerciseRepositoryProvider);
   return repository.watchExercises();
 });
+
+final exerciseProvider = StreamProvider.family<Exercise?, int>((ref, id) {
+  final repository = ref.watch(exerciseRepositoryProvider);
+  return repository.watchExerciseById(id);
+});
+
+final exerciseHistoryProvider =
+    StreamProvider.family<List<ExerciseSessionEntry>, int>(
+  (ref, exerciseId) {
+    final repository = ref.watch(exerciseAnalyticsRepositoryProvider);
+    return repository.watchExerciseHistory(exerciseId);
+  },
+);
+
+final exercisePRsProvider = StreamProvider.family<ExercisePRs, int>(
+  (ref, exerciseId) {
+    final repository = ref.watch(exerciseAnalyticsRepositoryProvider);
+    return repository.watchExercisePRs(exerciseId);
+  },
+);
+
+final exerciseSearchProvider =
+    StreamProvider.family<List<ExerciseSearchResult>, String>(
+  (ref, query) {
+    final repository = ref.watch(exerciseAnalyticsRepositoryProvider);
+    return repository.watchExerciseSearchResults(query);
+  },
+);
 
 final prescriptionsProvider =
     StreamProvider.family<List<PrescriptionWithExercise>, int>((ref, dayId) {

@@ -305,6 +305,48 @@ class $SettingsTable extends Settings with TableInfo<$SettingsTable, Setting> {
         requiredDuringInsert: false,
         defaultValue: const Constant('20,15,10,5,2.5,1.25'),
       );
+  static const VerificationMeta _backupAutoEnabledMeta = const VerificationMeta(
+    'backupAutoEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> backupAutoEnabled = GeneratedColumn<bool>(
+    'backup_auto_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("backup_auto_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _backupEncryptionEnabledMeta =
+      const VerificationMeta('backupEncryptionEnabled');
+  @override
+  late final GeneratedColumn<bool> backupEncryptionEnabled =
+      GeneratedColumn<bool>(
+        'backup_encryption_enabled',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("backup_encryption_enabled" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
+  static const VerificationMeta _lastAutoBackupAtMeta = const VerificationMeta(
+    'lastAutoBackupAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastAutoBackupAt =
+      GeneratedColumn<DateTime>(
+        'last_auto_backup_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -323,6 +365,9 @@ class $SettingsTable extends Settings with TableInfo<$SettingsTable, Setting> {
     barWeightKg,
     activeProgramId,
     plateInventoryCsv,
+    backupAutoEnabled,
+    backupEncryptionEnabled,
+    lastAutoBackupAt,
     createdAt,
   ];
   @override
@@ -367,6 +412,33 @@ class $SettingsTable extends Settings with TableInfo<$SettingsTable, Setting> {
         ),
       );
     }
+    if (data.containsKey('backup_auto_enabled')) {
+      context.handle(
+        _backupAutoEnabledMeta,
+        backupAutoEnabled.isAcceptableOrUnknown(
+          data['backup_auto_enabled']!,
+          _backupAutoEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('backup_encryption_enabled')) {
+      context.handle(
+        _backupEncryptionEnabledMeta,
+        backupEncryptionEnabled.isAcceptableOrUnknown(
+          data['backup_encryption_enabled']!,
+          _backupEncryptionEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_auto_backup_at')) {
+      context.handle(
+        _lastAutoBackupAtMeta,
+        lastAutoBackupAt.isAcceptableOrUnknown(
+          data['last_auto_backup_at']!,
+          _lastAutoBackupAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -398,6 +470,18 @@ class $SettingsTable extends Settings with TableInfo<$SettingsTable, Setting> {
         DriftSqlType.string,
         data['${effectivePrefix}plate_inventory_csv'],
       )!,
+      backupAutoEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}backup_auto_enabled'],
+      )!,
+      backupEncryptionEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}backup_encryption_enabled'],
+      )!,
+      lastAutoBackupAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_auto_backup_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -416,12 +500,18 @@ class Setting extends DataClass implements Insertable<Setting> {
   final double barWeightKg;
   final int? activeProgramId;
   final String plateInventoryCsv;
+  final bool backupAutoEnabled;
+  final bool backupEncryptionEnabled;
+  final DateTime? lastAutoBackupAt;
   final DateTime createdAt;
   const Setting({
     required this.id,
     required this.barWeightKg,
     this.activeProgramId,
     required this.plateInventoryCsv,
+    required this.backupAutoEnabled,
+    required this.backupEncryptionEnabled,
+    this.lastAutoBackupAt,
     required this.createdAt,
   });
   @override
@@ -433,6 +523,11 @@ class Setting extends DataClass implements Insertable<Setting> {
       map['active_program_id'] = Variable<int>(activeProgramId);
     }
     map['plate_inventory_csv'] = Variable<String>(plateInventoryCsv);
+    map['backup_auto_enabled'] = Variable<bool>(backupAutoEnabled);
+    map['backup_encryption_enabled'] = Variable<bool>(backupEncryptionEnabled);
+    if (!nullToAbsent || lastAutoBackupAt != null) {
+      map['last_auto_backup_at'] = Variable<DateTime>(lastAutoBackupAt);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -445,6 +540,11 @@ class Setting extends DataClass implements Insertable<Setting> {
           ? const Value.absent()
           : Value(activeProgramId),
       plateInventoryCsv: Value(plateInventoryCsv),
+      backupAutoEnabled: Value(backupAutoEnabled),
+      backupEncryptionEnabled: Value(backupEncryptionEnabled),
+      lastAutoBackupAt: lastAutoBackupAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastAutoBackupAt),
       createdAt: Value(createdAt),
     );
   }
@@ -459,6 +559,13 @@ class Setting extends DataClass implements Insertable<Setting> {
       barWeightKg: serializer.fromJson<double>(json['barWeightKg']),
       activeProgramId: serializer.fromJson<int?>(json['activeProgramId']),
       plateInventoryCsv: serializer.fromJson<String>(json['plateInventoryCsv']),
+      backupAutoEnabled: serializer.fromJson<bool>(json['backupAutoEnabled']),
+      backupEncryptionEnabled: serializer.fromJson<bool>(
+        json['backupEncryptionEnabled'],
+      ),
+      lastAutoBackupAt: serializer.fromJson<DateTime?>(
+        json['lastAutoBackupAt'],
+      ),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -470,6 +577,11 @@ class Setting extends DataClass implements Insertable<Setting> {
       'barWeightKg': serializer.toJson<double>(barWeightKg),
       'activeProgramId': serializer.toJson<int?>(activeProgramId),
       'plateInventoryCsv': serializer.toJson<String>(plateInventoryCsv),
+      'backupAutoEnabled': serializer.toJson<bool>(backupAutoEnabled),
+      'backupEncryptionEnabled': serializer.toJson<bool>(
+        backupEncryptionEnabled,
+      ),
+      'lastAutoBackupAt': serializer.toJson<DateTime?>(lastAutoBackupAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -479,6 +591,9 @@ class Setting extends DataClass implements Insertable<Setting> {
     double? barWeightKg,
     Value<int?> activeProgramId = const Value.absent(),
     String? plateInventoryCsv,
+    bool? backupAutoEnabled,
+    bool? backupEncryptionEnabled,
+    Value<DateTime?> lastAutoBackupAt = const Value.absent(),
     DateTime? createdAt,
   }) => Setting(
     id: id ?? this.id,
@@ -487,6 +602,12 @@ class Setting extends DataClass implements Insertable<Setting> {
         ? activeProgramId.value
         : this.activeProgramId,
     plateInventoryCsv: plateInventoryCsv ?? this.plateInventoryCsv,
+    backupAutoEnabled: backupAutoEnabled ?? this.backupAutoEnabled,
+    backupEncryptionEnabled:
+        backupEncryptionEnabled ?? this.backupEncryptionEnabled,
+    lastAutoBackupAt: lastAutoBackupAt.present
+        ? lastAutoBackupAt.value
+        : this.lastAutoBackupAt,
     createdAt: createdAt ?? this.createdAt,
   );
   Setting copyWithCompanion(SettingsCompanion data) {
@@ -501,6 +622,15 @@ class Setting extends DataClass implements Insertable<Setting> {
       plateInventoryCsv: data.plateInventoryCsv.present
           ? data.plateInventoryCsv.value
           : this.plateInventoryCsv,
+      backupAutoEnabled: data.backupAutoEnabled.present
+          ? data.backupAutoEnabled.value
+          : this.backupAutoEnabled,
+      backupEncryptionEnabled: data.backupEncryptionEnabled.present
+          ? data.backupEncryptionEnabled.value
+          : this.backupEncryptionEnabled,
+      lastAutoBackupAt: data.lastAutoBackupAt.present
+          ? data.lastAutoBackupAt.value
+          : this.lastAutoBackupAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -512,6 +642,9 @@ class Setting extends DataClass implements Insertable<Setting> {
           ..write('barWeightKg: $barWeightKg, ')
           ..write('activeProgramId: $activeProgramId, ')
           ..write('plateInventoryCsv: $plateInventoryCsv, ')
+          ..write('backupAutoEnabled: $backupAutoEnabled, ')
+          ..write('backupEncryptionEnabled: $backupEncryptionEnabled, ')
+          ..write('lastAutoBackupAt: $lastAutoBackupAt, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -523,6 +656,9 @@ class Setting extends DataClass implements Insertable<Setting> {
     barWeightKg,
     activeProgramId,
     plateInventoryCsv,
+    backupAutoEnabled,
+    backupEncryptionEnabled,
+    lastAutoBackupAt,
     createdAt,
   );
   @override
@@ -533,6 +669,9 @@ class Setting extends DataClass implements Insertable<Setting> {
           other.barWeightKg == this.barWeightKg &&
           other.activeProgramId == this.activeProgramId &&
           other.plateInventoryCsv == this.plateInventoryCsv &&
+          other.backupAutoEnabled == this.backupAutoEnabled &&
+          other.backupEncryptionEnabled == this.backupEncryptionEnabled &&
+          other.lastAutoBackupAt == this.lastAutoBackupAt &&
           other.createdAt == this.createdAt);
 }
 
@@ -541,12 +680,18 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
   final Value<double> barWeightKg;
   final Value<int?> activeProgramId;
   final Value<String> plateInventoryCsv;
+  final Value<bool> backupAutoEnabled;
+  final Value<bool> backupEncryptionEnabled;
+  final Value<DateTime?> lastAutoBackupAt;
   final Value<DateTime> createdAt;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.barWeightKg = const Value.absent(),
     this.activeProgramId = const Value.absent(),
     this.plateInventoryCsv = const Value.absent(),
+    this.backupAutoEnabled = const Value.absent(),
+    this.backupEncryptionEnabled = const Value.absent(),
+    this.lastAutoBackupAt = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   SettingsCompanion.insert({
@@ -554,6 +699,9 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
     this.barWeightKg = const Value.absent(),
     this.activeProgramId = const Value.absent(),
     this.plateInventoryCsv = const Value.absent(),
+    this.backupAutoEnabled = const Value.absent(),
+    this.backupEncryptionEnabled = const Value.absent(),
+    this.lastAutoBackupAt = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   static Insertable<Setting> custom({
@@ -561,6 +709,9 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
     Expression<double>? barWeightKg,
     Expression<int>? activeProgramId,
     Expression<String>? plateInventoryCsv,
+    Expression<bool>? backupAutoEnabled,
+    Expression<bool>? backupEncryptionEnabled,
+    Expression<DateTime>? lastAutoBackupAt,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -568,6 +719,10 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
       if (barWeightKg != null) 'bar_weight_kg': barWeightKg,
       if (activeProgramId != null) 'active_program_id': activeProgramId,
       if (plateInventoryCsv != null) 'plate_inventory_csv': plateInventoryCsv,
+      if (backupAutoEnabled != null) 'backup_auto_enabled': backupAutoEnabled,
+      if (backupEncryptionEnabled != null)
+        'backup_encryption_enabled': backupEncryptionEnabled,
+      if (lastAutoBackupAt != null) 'last_auto_backup_at': lastAutoBackupAt,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -577,6 +732,9 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
     Value<double>? barWeightKg,
     Value<int?>? activeProgramId,
     Value<String>? plateInventoryCsv,
+    Value<bool>? backupAutoEnabled,
+    Value<bool>? backupEncryptionEnabled,
+    Value<DateTime?>? lastAutoBackupAt,
     Value<DateTime>? createdAt,
   }) {
     return SettingsCompanion(
@@ -584,6 +742,10 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
       barWeightKg: barWeightKg ?? this.barWeightKg,
       activeProgramId: activeProgramId ?? this.activeProgramId,
       plateInventoryCsv: plateInventoryCsv ?? this.plateInventoryCsv,
+      backupAutoEnabled: backupAutoEnabled ?? this.backupAutoEnabled,
+      backupEncryptionEnabled:
+          backupEncryptionEnabled ?? this.backupEncryptionEnabled,
+      lastAutoBackupAt: lastAutoBackupAt ?? this.lastAutoBackupAt,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -603,6 +765,17 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
     if (plateInventoryCsv.present) {
       map['plate_inventory_csv'] = Variable<String>(plateInventoryCsv.value);
     }
+    if (backupAutoEnabled.present) {
+      map['backup_auto_enabled'] = Variable<bool>(backupAutoEnabled.value);
+    }
+    if (backupEncryptionEnabled.present) {
+      map['backup_encryption_enabled'] = Variable<bool>(
+        backupEncryptionEnabled.value,
+      );
+    }
+    if (lastAutoBackupAt.present) {
+      map['last_auto_backup_at'] = Variable<DateTime>(lastAutoBackupAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -616,6 +789,9 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
           ..write('barWeightKg: $barWeightKg, ')
           ..write('activeProgramId: $activeProgramId, ')
           ..write('plateInventoryCsv: $plateInventoryCsv, ')
+          ..write('backupAutoEnabled: $backupAutoEnabled, ')
+          ..write('backupEncryptionEnabled: $backupEncryptionEnabled, ')
+          ..write('lastAutoBackupAt: $lastAutoBackupAt, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -4722,6 +4898,9 @@ typedef $$SettingsTableCreateCompanionBuilder =
       Value<double> barWeightKg,
       Value<int?> activeProgramId,
       Value<String> plateInventoryCsv,
+      Value<bool> backupAutoEnabled,
+      Value<bool> backupEncryptionEnabled,
+      Value<DateTime?> lastAutoBackupAt,
       Value<DateTime> createdAt,
     });
 typedef $$SettingsTableUpdateCompanionBuilder =
@@ -4730,6 +4909,9 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<double> barWeightKg,
       Value<int?> activeProgramId,
       Value<String> plateInventoryCsv,
+      Value<bool> backupAutoEnabled,
+      Value<bool> backupEncryptionEnabled,
+      Value<DateTime?> lastAutoBackupAt,
       Value<DateTime> createdAt,
     });
 
@@ -4778,6 +4960,21 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get plateInventoryCsv => $composableBuilder(
     column: $table.plateInventoryCsv,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get backupAutoEnabled => $composableBuilder(
+    column: $table.backupAutoEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get backupEncryptionEnabled => $composableBuilder(
+    column: $table.backupEncryptionEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastAutoBackupAt => $composableBuilder(
+    column: $table.lastAutoBackupAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4834,6 +5031,21 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get backupAutoEnabled => $composableBuilder(
+    column: $table.backupAutoEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get backupEncryptionEnabled => $composableBuilder(
+    column: $table.backupEncryptionEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastAutoBackupAt => $composableBuilder(
+    column: $table.lastAutoBackupAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -4882,6 +5094,21 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<String> get plateInventoryCsv => $composableBuilder(
     column: $table.plateInventoryCsv,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get backupAutoEnabled => $composableBuilder(
+    column: $table.backupAutoEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get backupEncryptionEnabled => $composableBuilder(
+    column: $table.backupEncryptionEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastAutoBackupAt => $composableBuilder(
+    column: $table.lastAutoBackupAt,
     builder: (column) => column,
   );
 
@@ -4944,12 +5171,18 @@ class $$SettingsTableTableManager
                 Value<double> barWeightKg = const Value.absent(),
                 Value<int?> activeProgramId = const Value.absent(),
                 Value<String> plateInventoryCsv = const Value.absent(),
+                Value<bool> backupAutoEnabled = const Value.absent(),
+                Value<bool> backupEncryptionEnabled = const Value.absent(),
+                Value<DateTime?> lastAutoBackupAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => SettingsCompanion(
                 id: id,
                 barWeightKg: barWeightKg,
                 activeProgramId: activeProgramId,
                 plateInventoryCsv: plateInventoryCsv,
+                backupAutoEnabled: backupAutoEnabled,
+                backupEncryptionEnabled: backupEncryptionEnabled,
+                lastAutoBackupAt: lastAutoBackupAt,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -4958,12 +5191,18 @@ class $$SettingsTableTableManager
                 Value<double> barWeightKg = const Value.absent(),
                 Value<int?> activeProgramId = const Value.absent(),
                 Value<String> plateInventoryCsv = const Value.absent(),
+                Value<bool> backupAutoEnabled = const Value.absent(),
+                Value<bool> backupEncryptionEnabled = const Value.absent(),
+                Value<DateTime?> lastAutoBackupAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => SettingsCompanion.insert(
                 id: id,
                 barWeightKg: barWeightKg,
                 activeProgramId: activeProgramId,
                 plateInventoryCsv: plateInventoryCsv,
+                backupAutoEnabled: backupAutoEnabled,
+                backupEncryptionEnabled: backupEncryptionEnabled,
+                lastAutoBackupAt: lastAutoBackupAt,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0

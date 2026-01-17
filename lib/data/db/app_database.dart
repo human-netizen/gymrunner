@@ -20,6 +20,11 @@ class Settings extends Table {
       integer().nullable().references(Programs, #id, onDelete: KeyAction.setNull)();
   TextColumn get plateInventoryCsv =>
       text().withDefault(const Constant('20,15,10,5,2.5,1.25'))();
+  BoolColumn get backupAutoEnabled =>
+      boolean().withDefault(const Constant(false))();
+  BoolColumn get backupEncryptionEnabled =>
+      boolean().withDefault(const Constant(false))();
+  DateTimeColumn get lastAutoBackupAt => dateTime().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
 }
@@ -149,7 +154,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -204,6 +209,11 @@ class AppDatabase extends _$AppDatabase {
               column: 'is_deload',
               onMissing: () => m.addColumn(sessions, sessions.isDeload),
             );
+          }
+          if (from < 8) {
+            await m.addColumn(settings, settings.backupAutoEnabled);
+            await m.addColumn(settings, settings.backupEncryptionEnabled);
+            await m.addColumn(settings, settings.lastAutoBackupAt);
           }
         },
       );

@@ -145,6 +145,27 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                             ),
                           ),
                         ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Top e1RM sets',
+                        style: textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      if (summary.topE1rmSets.isEmpty)
+                        const Text('No PR data yet.')
+                      else
+                        ...summary.topE1rmSets.map(
+                          (entry) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(entry.exerciseName),
+                            subtitle: Text(
+                              _formatShortDate(context, entry.date),
+                            ),
+                            trailing: Text(
+                              '${entry.e1rm.toStringAsFixed(1)} kg',
+                            ),
+                          ),
+                        ),
                     ],
                   );
                 },
@@ -180,6 +201,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
       return muscle;
     }
     return muscle[0].toUpperCase() + muscle.substring(1);
+  }
+
+  String _formatShortDate(BuildContext context, DateTime date) {
+    return MaterialLocalizations.of(context).formatShortDate(date);
   }
 }
 

@@ -4,7 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/db/app_database.dart';
 import '../../data/providers.dart';
-import '../../data/templates/template_import_service.dart';
+import '../../services/template_import_service.dart';
+import '../../templates/science_upper_lower_template.dart';
 
 class ProgramsScreen extends ConsumerWidget {
   const ProgramsScreen({super.key});
@@ -140,26 +141,99 @@ class ProgramsScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) async {
-    final result = await ref
-        .read(templateImportServiceProvider)
-        .importScienceUpperLowerTemplate();
+    final importService = ref.read(templateImportServiceProvider);
+    final existingProgram =
+        await importService.getProgramByName(scienceUpperLowerTemplate.name);
 
     if (!context.mounted) {
       return;
     }
 
-    if (!result.wasCreated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Already imported.')),
+    if (existingProgram != null) {
+      final action = await showDialog<_ImportAction>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Already imported'),
+          content: const Text('What do you want?'),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(_ImportAction.cancel),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(_ImportAction.overwrite),
+              child: const Text('Overwrite'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(_ImportAction.setActive),
+              child: const Text('Set Active'),
+            ),
+          ],
+        ),
       );
-      context.push('/programs/${result.programId}');
+
+      if (action == null || action == _ImportAction.cancel) {
+        return;
+      }
+
+      if (action == _ImportAction.setActive) {
+        await ref
+            .read(programRepositoryProvider)
+            .setActiveProgram(existingProgram.id);
+        if (!context.mounted) {
+          return;
+        }
+        context.push('/programs/${existingProgram.id}');
+        return;
+      }
+
+      final programId = await importService.importScienceUpperLower(
+        overwriteIfExists: true,
+      );
+
+      if (!context.mounted) {
+        return;
+      }
+
+      final setActive = await _promptSetActive(context);
+      if (setActive == true) {
+        await ref.read(programRepositoryProvider).setActiveProgram(programId);
+      }
+
+      if (!context.mounted) {
+        return;
+      }
+      context.push('/programs/$programId');
       return;
     }
 
-    final setActive = await showDialog<bool>(
+    final programId = await importService.importScienceUpperLower(
+      overwriteIfExists: false,
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    final setActive = await _promptSetActive(context);
+    if (setActive == true) {
+      await ref.read(programRepositoryProvider).setActiveProgram(programId);
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+    context.push('/programs/$programId');
+  }
+
+  Future<bool?> _promptSetActive(BuildContext context) {
+    return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Template imported'),
+        title: const Text('Set active program?'),
         content: const Text('Set this program as active?'),
         actions: [
           TextButton(
@@ -173,17 +247,6 @@ class ProgramsScreen extends ConsumerWidget {
         ],
       ),
     );
-
-    if (setActive == true) {
-      await ref
-          .read(programRepositoryProvider)
-          .setActiveProgram(result.programId);
-    }
-
-    if (!context.mounted) {
-      return;
-    }
-    context.push('/programs/${result.programId}');
   }
 
   Future<void> _renameProgram(
@@ -269,3 +332,5 @@ class ProgramsScreen extends ConsumerWidget {
 }
 
 enum _ProgramAction { rename, delete }
+
+enum _ImportAction { setActive, overwrite, cancel }
