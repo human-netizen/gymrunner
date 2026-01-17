@@ -511,6 +511,24 @@ class SessionRepository {
     int reps,
     {bool isWarmup = false}
   ) async {
+    await addSetReturningLog(
+      sessionExerciseId,
+      weightKg,
+      reps,
+      isWarmup: isWarmup,
+    );
+  }
+
+  Future<SetLog> addSetReturningLog(
+    int sessionExerciseId,
+    double weightKg,
+    int reps, {
+    bool isWarmup = false,
+  }) async {
+    final now = DateTime.now();
+    late int insertedId;
+    late int nextIndex;
+
     await _db.transaction(() async {
       final countExp = _db.setLogs.id.count();
       final countQuery = _db.selectOnly(_db.setLogs)
@@ -521,15 +539,16 @@ class SessionRepository {
         );
       final count =
           await countQuery.map((row) => row.read(countExp)).getSingle();
-      final nextIndex = (count ?? 0) + 1;
+      nextIndex = (count ?? 0) + 1;
 
-      await _db.into(_db.setLogs).insert(
+      insertedId = await _db.into(_db.setLogs).insert(
             SetLogsCompanion.insert(
               sessionExerciseId: sessionExerciseId,
               setIndex: nextIndex,
               weightKg: weightKg,
               reps: reps,
               isWarmup: drift.Value(isWarmup),
+              createdAt: drift.Value(now),
             ),
           );
 
@@ -552,6 +571,17 @@ class SessionRepository {
         }
       }
     });
+
+    return SetLog(
+      id: insertedId,
+      sessionExerciseId: sessionExerciseId,
+      setIndex: nextIndex,
+      weightKg: weightKg,
+      reps: reps,
+      isWarmup: isWarmup,
+      rpe: null,
+      createdAt: now,
+    );
   }
 
   Future<void> deleteLastSet(int sessionExerciseId) async {
@@ -573,35 +603,38 @@ class SessionRepository {
     await (_db.delete(_db.setLogs)..where((tbl) => tbl.id.equals(lastSet.id)))
         .go();
 
-    if (lastSet.isWarmup) {
+    if (!lastSet.isWarmup) {
+      await _updateCompletionForSessionExercise(sessionExerciseId);
+    }
+  }
+
+  Future<void> updateSetLog({
+    required int id,
+    required double weightKg,
+    required int reps,
+  }) async {
+    await (_db.update(_db.setLogs)..where((tbl) => tbl.id.equals(id))).write(
+      SetLogsCompanion(
+        weightKg: drift.Value(weightKg),
+        reps: drift.Value(reps),
+      ),
+    );
+  }
+
+  Future<void> deleteSetLog(int setLogId) async {
+    final setLog = await (_db.select(_db.setLogs)
+          ..where((tbl) => tbl.id.equals(setLogId))
+          ..limit(1))
+        .getSingleOrNull();
+    if (setLog == null) {
       return;
     }
 
-    final countExp = _db.setLogs.id.count();
-    final countQuery = _db.selectOnly(_db.setLogs)
-      ..addColumns([countExp])
-      ..where(
-        _db.setLogs.sessionExerciseId.equals(sessionExerciseId) &
-            _db.setLogs.isWarmup.equals(false),
-      );
-    final count = await countQuery.map((row) => row.read(countExp)).getSingle();
-    final remaining = count ?? 0;
+    await (_db.delete(_db.setLogs)..where((tbl) => tbl.id.equals(setLogId)))
+        .go();
 
-    final sessionExercise = await (_db.select(_db.sessionExercises)
-          ..where((tbl) => tbl.id.equals(sessionExerciseId))
-          ..limit(1))
-        .getSingle();
-
-    if (remaining < sessionExercise.setsTarget &&
-        sessionExercise.isCompleted) {
-      await (_db.update(_db.sessionExercises)
-            ..where((tbl) => tbl.id.equals(sessionExerciseId)))
-          .write(
-        const SessionExercisesCompanion(
-          isCompleted: drift.Value(false),
-          completedAt: drift.Value(null),
-        ),
-      );
+    if (!setLog.isWarmup) {
+      await _updateCompletionForSessionExercise(setLog.sessionExerciseId);
     }
   }
 
@@ -660,6 +693,66 @@ class SessionRepository {
 
     sets.sort((a, b) => a.setIndex.compareTo(b.setIndex));
     return sets;
+  }
+
+  Future<void> _updateCompletionForSessionExercise(
+    int sessionExerciseId,
+  ) async {
+    final countExp = _db.setLogs.id.count();
+    final countQuery = _db.selectOnly(_db.setLogs)
+      ..addColumns([countExp])
+      ..where(
+        _db.setLogs.sessionExerciseId.equals(sessionExerciseId) &
+            _db.setLogs.isWarmup.equals(false),
+      );
+    final count = await countQuery.map((row) => row.read(countExp)).getSingle();
+    final remaining = count ?? 0;
+
+    final sessionExercise = await (_db.select(_db.sessionExercises)
+          ..where((tbl) => tbl.id.equals(sessionExerciseId))
+          ..limit(1))
+        .getSingle();
+
+    final shouldComplete = remaining >= sessionExercise.setsTarget;
+    if (shouldComplete == sessionExercise.isCompleted) {
+      return;
+    }
+
+    await (_db.update(_db.sessionExercises)
+          ..where((tbl) => tbl.id.equals(sessionExerciseId)))
+        .write(
+      SessionExercisesCompanion(
+        isCompleted: drift.Value(shouldComplete),
+        completedAt:
+            drift.Value(shouldComplete ? DateTime.now() : null),
+      ),
+    );
+  }
+
+  Future<int?> getNextSessionExerciseId(
+    int sessionId,
+    int currentSessionExerciseId,
+  ) async {
+    final rows = await (_db.select(_db.sessionExercises)
+          ..where((tbl) => tbl.sessionId.equals(sessionId))
+          ..orderBy([
+            (tbl) => drift.OrderingTerm(expression: tbl.orderIndex),
+          ]))
+        .get();
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final index =
+        rows.indexWhere((row) => row.id == currentSessionExerciseId);
+    if (index == -1) {
+      return null;
+    }
+    if (index + 1 >= rows.length) {
+      return null;
+    }
+    return rows[index + 1].id;
   }
 }
 

@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gym_runner/app/app.dart';
 import 'package:gym_runner/data/db/app_database.dart';
 import 'package:gym_runner/data/providers.dart';
+import 'package:gym_runner/data/repositories/review_repository.dart';
 import 'package:gym_runner/data/repositories/session_repository.dart';
 import 'package:gym_runner/data/seed/seed_service.dart';
 
@@ -31,6 +32,18 @@ void main() {
           ),
           activeSessionBundleProvider.overrideWith(
             (ref) => Stream<ActiveSessionBundle?>.value(null),
+          ),
+          reviewSummaryProvider.overrideWith(
+            (ref, range) => Stream<ReviewSummary>.value(
+              const ReviewSummary(
+                sessionsCompleted: 0,
+                totalWorkingSets: 0,
+                totalVolume: 0,
+                totalDuration: Duration.zero,
+                muscleSummary: [],
+                exerciseHighlights: [],
+              ),
+            ),
           ),
         ],
         child: const GymRunnerApp(),

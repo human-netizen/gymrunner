@@ -4,6 +4,7 @@ import 'db/app_database.dart';
 import 'repositories/exercise_repository.dart';
 import 'repositories/prescription_repository.dart';
 import 'repositories/program_repository.dart';
+import 'repositories/review_repository.dart';
 import 'repositories/session_repository.dart';
 import 'repositories/settings_repository.dart';
 
@@ -32,6 +33,11 @@ final sessionRepositoryProvider = Provider<SessionRepository>((ref) {
   final db = ref.read(appDatabaseProvider);
   final settingsRepository = ref.read(settingsRepositoryProvider);
   return SessionRepository(db, settingsRepository);
+});
+
+final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
+  final db = ref.read(appDatabaseProvider);
+  return ReviewRepository(db);
 });
 
 final settingsStreamProvider = StreamProvider<Setting?>((ref) {
@@ -140,4 +146,10 @@ final sessionDetailsProvider =
     StreamProvider.family<SessionDetails?, int>((ref, sessionId) {
   final repository = ref.watch(sessionRepositoryProvider);
   return repository.watchSessionDetails(sessionId);
+});
+
+final reviewSummaryProvider =
+    StreamProvider.family<ReviewSummary, ReviewRange>((ref, range) {
+  final repository = ref.watch(reviewRepositoryProvider);
+  return repository.watchReviewSummary(range.start, range.end);
 });
