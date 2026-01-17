@@ -84,6 +84,8 @@ class Sessions extends Table {
       .nullable()
       .references(WorkoutDays, #id, onDelete: KeyAction.setNull)();
   IntColumn get currentSessionExerciseId => integer().nullable()();
+  BoolColumn get isDeload =>
+      boolean().withDefault(const Constant(false))();
   DateTimeColumn get startedAt =>
       dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get finishedAt => dateTime().nullable()();
@@ -147,7 +149,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -193,8 +195,30 @@ class AppDatabase extends _$AppDatabase {
               sessionExercises.suggestedWorkingWeightKg,
             );
           }
+          if (from < 6) {
+            await m.addColumn(sessions, sessions.isDeload);
+          }
+          if (from < 7) {
+            await _ensureColumnExists(
+              table: 'sessions',
+              column: 'is_deload',
+              onMissing: () => m.addColumn(sessions, sessions.isDeload),
+            );
+          }
         },
       );
+
+  Future<void> _ensureColumnExists({
+    required String table,
+    required String column,
+    required Future<void> Function() onMissing,
+  }) async {
+    final rows = await customSelect('PRAGMA table_info($table)').get();
+    final hasColumn = rows.any((row) => row.data['name'] == column);
+    if (!hasColumn) {
+      await onMissing();
+    }
+  }
 }
 
 LazyDatabase _openConnection() {

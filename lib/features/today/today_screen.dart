@@ -158,11 +158,7 @@ class TodayPlanView extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 FilledButton(
-                  onPressed: () async {
-                    await ref
-                        .read(sessionRepositoryProvider)
-                        .startSessionForWorkoutDay(day.id);
-                  },
+                  onPressed: () => _startWorkout(context, ref, day.id),
                   child: const Text('Start Workout'),
                 ),
               ],
@@ -171,6 +167,40 @@ class TodayPlanView extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<void> _startWorkout(
+    BuildContext context,
+    WidgetRef ref,
+    int workoutDayId,
+  ) async {
+    final isDeload = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Start Normal'),
+              onTap: () => Navigator.of(context).pop(false),
+            ),
+            ListTile(
+              title: const Text('Start Deload'),
+              subtitle: const Text('Recommended every 4-6 weeks'),
+              onTap: () => Navigator.of(context).pop(true),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (isDeload == null) {
+      return;
+    }
+
+    await ref
+        .read(sessionRepositoryProvider)
+        .startSessionForWorkoutDay(workoutDayId, isDeload: isDeload);
   }
 }
 

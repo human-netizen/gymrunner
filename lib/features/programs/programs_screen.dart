@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/db/app_database.dart';
 import '../../data/providers.dart';
+import '../../data/templates/template_import_service.dart';
 
 class ProgramsScreen extends ConsumerWidget {
   const ProgramsScreen({super.key});
@@ -20,6 +21,11 @@ class ProgramsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Programs'),
         actions: [
+          IconButton(
+            onPressed: () => _showImportSheet(context, ref),
+            icon: const Icon(Icons.file_download),
+            tooltip: 'Import Template',
+          ),
           IconButton(
             onPressed: () => context.push('/programs/exercises'),
             icon: const Icon(Icons.fitness_center),
@@ -107,6 +113,77 @@ class ProgramsScreen extends ConsumerWidget {
       return;
     }
     await ref.read(programRepositoryProvider).createProgram(name);
+  }
+
+  Future<void> _showImportSheet(BuildContext context, WidgetRef ref) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Science-Based Upper/Lower (5-Day)'),
+              subtitle: const Text('5-day upper/lower template'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _importScienceTemplate(context, ref);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _importScienceTemplate(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final result = await ref
+        .read(templateImportServiceProvider)
+        .importScienceUpperLowerTemplate();
+
+    if (!context.mounted) {
+      return;
+    }
+
+    if (!result.wasCreated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Already imported.')),
+      );
+      context.push('/programs/${result.programId}');
+      return;
+    }
+
+    final setActive = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Template imported'),
+        content: const Text('Set this program as active?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Set Active'),
+          ),
+        ],
+      ),
+    );
+
+    if (setActive == true) {
+      await ref
+          .read(programRepositoryProvider)
+          .setActiveProgram(result.programId);
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+    context.push('/programs/${result.programId}');
   }
 
   Future<void> _renameProgram(

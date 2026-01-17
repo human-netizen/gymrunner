@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,8 +18,27 @@ class HistoryScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         child: sessionsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => const Center(
-            child: Text('Failed to load history.'),
+          error: (error, stack) => SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                const Text('Failed to load history.'),
+                const SizedBox(height: 8),
+                Text(error.toString(), textAlign: TextAlign.center),
+                if (kDebugMode) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    stack.toString(),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () => ref.invalidate(recentSessionsProvider),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
           data: (sessions) {
             if (sessions.isEmpty) {

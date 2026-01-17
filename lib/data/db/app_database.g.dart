@@ -2269,6 +2269,21 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         type: DriftSqlType.int,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _isDeloadMeta = const VerificationMeta(
+    'isDeload',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeload = GeneratedColumn<bool>(
+    'is_deload',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deload" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _startedAtMeta = const VerificationMeta(
     'startedAt',
   );
@@ -2307,6 +2322,7 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     programId,
     workoutDayId,
     currentSessionExerciseId,
+    isDeload,
     startedAt,
     finishedAt,
     note,
@@ -2348,6 +2364,12 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
           data['current_session_exercise_id']!,
           _currentSessionExerciseIdMeta,
         ),
+      );
+    }
+    if (data.containsKey('is_deload')) {
+      context.handle(
+        _isDeloadMeta,
+        isDeload.isAcceptableOrUnknown(data['is_deload']!, _isDeloadMeta),
       );
     }
     if (data.containsKey('started_at')) {
@@ -2393,6 +2415,10 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         DriftSqlType.int,
         data['${effectivePrefix}current_session_exercise_id'],
       ),
+      isDeload: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_deload'],
+      )!,
       startedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}started_at'],
@@ -2419,6 +2445,7 @@ class Session extends DataClass implements Insertable<Session> {
   final int? programId;
   final int? workoutDayId;
   final int? currentSessionExerciseId;
+  final bool isDeload;
   final DateTime startedAt;
   final DateTime? finishedAt;
   final String? note;
@@ -2427,6 +2454,7 @@ class Session extends DataClass implements Insertable<Session> {
     this.programId,
     this.workoutDayId,
     this.currentSessionExerciseId,
+    required this.isDeload,
     required this.startedAt,
     this.finishedAt,
     this.note,
@@ -2446,6 +2474,7 @@ class Session extends DataClass implements Insertable<Session> {
         currentSessionExerciseId,
       );
     }
+    map['is_deload'] = Variable<bool>(isDeload);
     map['started_at'] = Variable<DateTime>(startedAt);
     if (!nullToAbsent || finishedAt != null) {
       map['finished_at'] = Variable<DateTime>(finishedAt);
@@ -2468,6 +2497,7 @@ class Session extends DataClass implements Insertable<Session> {
       currentSessionExerciseId: currentSessionExerciseId == null && nullToAbsent
           ? const Value.absent()
           : Value(currentSessionExerciseId),
+      isDeload: Value(isDeload),
       startedAt: Value(startedAt),
       finishedAt: finishedAt == null && nullToAbsent
           ? const Value.absent()
@@ -2488,6 +2518,7 @@ class Session extends DataClass implements Insertable<Session> {
       currentSessionExerciseId: serializer.fromJson<int?>(
         json['currentSessionExerciseId'],
       ),
+      isDeload: serializer.fromJson<bool>(json['isDeload']),
       startedAt: serializer.fromJson<DateTime>(json['startedAt']),
       finishedAt: serializer.fromJson<DateTime?>(json['finishedAt']),
       note: serializer.fromJson<String?>(json['note']),
@@ -2503,6 +2534,7 @@ class Session extends DataClass implements Insertable<Session> {
       'currentSessionExerciseId': serializer.toJson<int?>(
         currentSessionExerciseId,
       ),
+      'isDeload': serializer.toJson<bool>(isDeload),
       'startedAt': serializer.toJson<DateTime>(startedAt),
       'finishedAt': serializer.toJson<DateTime?>(finishedAt),
       'note': serializer.toJson<String?>(note),
@@ -2514,6 +2546,7 @@ class Session extends DataClass implements Insertable<Session> {
     Value<int?> programId = const Value.absent(),
     Value<int?> workoutDayId = const Value.absent(),
     Value<int?> currentSessionExerciseId = const Value.absent(),
+    bool? isDeload,
     DateTime? startedAt,
     Value<DateTime?> finishedAt = const Value.absent(),
     Value<String?> note = const Value.absent(),
@@ -2524,6 +2557,7 @@ class Session extends DataClass implements Insertable<Session> {
     currentSessionExerciseId: currentSessionExerciseId.present
         ? currentSessionExerciseId.value
         : this.currentSessionExerciseId,
+    isDeload: isDeload ?? this.isDeload,
     startedAt: startedAt ?? this.startedAt,
     finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
     note: note.present ? note.value : this.note,
@@ -2538,6 +2572,7 @@ class Session extends DataClass implements Insertable<Session> {
       currentSessionExerciseId: data.currentSessionExerciseId.present
           ? data.currentSessionExerciseId.value
           : this.currentSessionExerciseId,
+      isDeload: data.isDeload.present ? data.isDeload.value : this.isDeload,
       startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
       finishedAt: data.finishedAt.present
           ? data.finishedAt.value
@@ -2553,6 +2588,7 @@ class Session extends DataClass implements Insertable<Session> {
           ..write('programId: $programId, ')
           ..write('workoutDayId: $workoutDayId, ')
           ..write('currentSessionExerciseId: $currentSessionExerciseId, ')
+          ..write('isDeload: $isDeload, ')
           ..write('startedAt: $startedAt, ')
           ..write('finishedAt: $finishedAt, ')
           ..write('note: $note')
@@ -2566,6 +2602,7 @@ class Session extends DataClass implements Insertable<Session> {
     programId,
     workoutDayId,
     currentSessionExerciseId,
+    isDeload,
     startedAt,
     finishedAt,
     note,
@@ -2578,6 +2615,7 @@ class Session extends DataClass implements Insertable<Session> {
           other.programId == this.programId &&
           other.workoutDayId == this.workoutDayId &&
           other.currentSessionExerciseId == this.currentSessionExerciseId &&
+          other.isDeload == this.isDeload &&
           other.startedAt == this.startedAt &&
           other.finishedAt == this.finishedAt &&
           other.note == this.note);
@@ -2588,6 +2626,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
   final Value<int?> programId;
   final Value<int?> workoutDayId;
   final Value<int?> currentSessionExerciseId;
+  final Value<bool> isDeload;
   final Value<DateTime> startedAt;
   final Value<DateTime?> finishedAt;
   final Value<String?> note;
@@ -2596,6 +2635,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.programId = const Value.absent(),
     this.workoutDayId = const Value.absent(),
     this.currentSessionExerciseId = const Value.absent(),
+    this.isDeload = const Value.absent(),
     this.startedAt = const Value.absent(),
     this.finishedAt = const Value.absent(),
     this.note = const Value.absent(),
@@ -2605,6 +2645,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.programId = const Value.absent(),
     this.workoutDayId = const Value.absent(),
     this.currentSessionExerciseId = const Value.absent(),
+    this.isDeload = const Value.absent(),
     this.startedAt = const Value.absent(),
     this.finishedAt = const Value.absent(),
     this.note = const Value.absent(),
@@ -2614,6 +2655,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Expression<int>? programId,
     Expression<int>? workoutDayId,
     Expression<int>? currentSessionExerciseId,
+    Expression<bool>? isDeload,
     Expression<DateTime>? startedAt,
     Expression<DateTime>? finishedAt,
     Expression<String>? note,
@@ -2624,6 +2666,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       if (workoutDayId != null) 'workout_day_id': workoutDayId,
       if (currentSessionExerciseId != null)
         'current_session_exercise_id': currentSessionExerciseId,
+      if (isDeload != null) 'is_deload': isDeload,
       if (startedAt != null) 'started_at': startedAt,
       if (finishedAt != null) 'finished_at': finishedAt,
       if (note != null) 'note': note,
@@ -2635,6 +2678,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Value<int?>? programId,
     Value<int?>? workoutDayId,
     Value<int?>? currentSessionExerciseId,
+    Value<bool>? isDeload,
     Value<DateTime>? startedAt,
     Value<DateTime?>? finishedAt,
     Value<String?>? note,
@@ -2645,6 +2689,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       workoutDayId: workoutDayId ?? this.workoutDayId,
       currentSessionExerciseId:
           currentSessionExerciseId ?? this.currentSessionExerciseId,
+      isDeload: isDeload ?? this.isDeload,
       startedAt: startedAt ?? this.startedAt,
       finishedAt: finishedAt ?? this.finishedAt,
       note: note ?? this.note,
@@ -2668,6 +2713,9 @@ class SessionsCompanion extends UpdateCompanion<Session> {
         currentSessionExerciseId.value,
       );
     }
+    if (isDeload.present) {
+      map['is_deload'] = Variable<bool>(isDeload.value);
+    }
     if (startedAt.present) {
       map['started_at'] = Variable<DateTime>(startedAt.value);
     }
@@ -2687,6 +2735,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
           ..write('programId: $programId, ')
           ..write('workoutDayId: $workoutDayId, ')
           ..write('currentSessionExerciseId: $currentSessionExerciseId, ')
+          ..write('isDeload: $isDeload, ')
           ..write('startedAt: $startedAt, ')
           ..write('finishedAt: $finishedAt, ')
           ..write('note: $note')
@@ -6528,6 +6577,7 @@ typedef $$SessionsTableCreateCompanionBuilder =
       Value<int?> programId,
       Value<int?> workoutDayId,
       Value<int?> currentSessionExerciseId,
+      Value<bool> isDeload,
       Value<DateTime> startedAt,
       Value<DateTime?> finishedAt,
       Value<String?> note,
@@ -6538,6 +6588,7 @@ typedef $$SessionsTableUpdateCompanionBuilder =
       Value<int?> programId,
       Value<int?> workoutDayId,
       Value<int?> currentSessionExerciseId,
+      Value<bool> isDeload,
       Value<DateTime> startedAt,
       Value<DateTime?> finishedAt,
       Value<String?> note,
@@ -6623,6 +6674,11 @@ class $$SessionsTableFilterComposer
 
   ColumnFilters<int> get currentSessionExerciseId => $composableBuilder(
     column: $table.currentSessionExerciseId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeload => $composableBuilder(
+    column: $table.isDeload,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6732,6 +6788,11 @@ class $$SessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isDeload => $composableBuilder(
+    column: $table.isDeload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get startedAt => $composableBuilder(
     column: $table.startedAt,
     builder: (column) => ColumnOrderings(column),
@@ -6810,6 +6871,9 @@ class $$SessionsTableAnnotationComposer
     column: $table.currentSessionExerciseId,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get isDeload =>
+      $composableBuilder(column: $table.isDeload, builder: (column) => column);
 
   GeneratedColumn<DateTime> get startedAt =>
       $composableBuilder(column: $table.startedAt, builder: (column) => column);
@@ -6930,6 +6994,7 @@ class $$SessionsTableTableManager
                 Value<int?> programId = const Value.absent(),
                 Value<int?> workoutDayId = const Value.absent(),
                 Value<int?> currentSessionExerciseId = const Value.absent(),
+                Value<bool> isDeload = const Value.absent(),
                 Value<DateTime> startedAt = const Value.absent(),
                 Value<DateTime?> finishedAt = const Value.absent(),
                 Value<String?> note = const Value.absent(),
@@ -6938,6 +7003,7 @@ class $$SessionsTableTableManager
                 programId: programId,
                 workoutDayId: workoutDayId,
                 currentSessionExerciseId: currentSessionExerciseId,
+                isDeload: isDeload,
                 startedAt: startedAt,
                 finishedAt: finishedAt,
                 note: note,
@@ -6948,6 +7014,7 @@ class $$SessionsTableTableManager
                 Value<int?> programId = const Value.absent(),
                 Value<int?> workoutDayId = const Value.absent(),
                 Value<int?> currentSessionExerciseId = const Value.absent(),
+                Value<bool> isDeload = const Value.absent(),
                 Value<DateTime> startedAt = const Value.absent(),
                 Value<DateTime?> finishedAt = const Value.absent(),
                 Value<String?> note = const Value.absent(),
@@ -6956,6 +7023,7 @@ class $$SessionsTableTableManager
                 programId: programId,
                 workoutDayId: workoutDayId,
                 currentSessionExerciseId: currentSessionExerciseId,
+                isDeload: isDeload,
                 startedAt: startedAt,
                 finishedAt: finishedAt,
                 note: note,

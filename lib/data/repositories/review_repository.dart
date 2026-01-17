@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:drift/drift.dart' as drift;
 
 import '../db/app_database.dart';
@@ -76,33 +74,6 @@ class ReviewRepository {
     DateTime rangeStart,
     DateTime rangeEnd,
   ) {
-    final sessionsStream = _watchSessions(rangeStart, rangeEnd);
-    final setsStream = _watchWorkingSets(rangeStart, rangeEnd);
-
-    return _combineLatest2<List<Session>, List<_WorkingSetRow>, ReviewSummary>(
-      sessionsStream,
-      setsStream,
-      (sessions, sets) => _buildSummary(sessions, sets),
-    );
-  }
-
-  Stream<List<Session>> _watchSessions(
-    DateTime rangeStart,
-    DateTime rangeEnd,
-  ) {
-    final query = _db.select(_db.sessions)
-      ..where(
-        (tbl) =>
-            tbl.finishedAt.isNotNull() &
-            tbl.finishedAt.isBetweenValues(rangeStart, rangeEnd),
-      );
-    return query.watch();
-  }
-
-  Stream<List<_WorkingSetRow>> _watchWorkingSets(
-    DateTime rangeStart,
-    DateTime rangeEnd,
-  ) {
     final query = _db.select(_db.setLogs).join([
       drift.innerJoin(
         _db.sessionExercises,
@@ -117,29 +88,42 @@ class ReviewRepository {
         _db.exercises.id.equalsExp(_db.sessionExercises.exerciseId),
       ),
     ]);
+
+    final rangeCondition = _db.sessions.startedAt.isBetweenValues(
+          rangeStart,
+          rangeEnd,
+        ) |
+        _db.sessions.finishedAt.isBetweenValues(rangeStart, rangeEnd);
+
     query.where(
       _db.setLogs.isWarmup.equals(false) &
           _db.sessions.finishedAt.isNotNull() &
-          _db.sessions.finishedAt.isBetweenValues(rangeStart, rangeEnd),
+          rangeCondition,
     );
 
     return query.watch().map((rows) {
-      return rows
+      final workingSets = rows
           .map(
             (row) => _WorkingSetRow(
               setLog: row.readTable(_db.setLogs),
               exercise: row.readTable(_db.exercises),
+              session: row.readTable(_db.sessions),
             ),
           )
           .toList();
+
+      return _buildSummary(workingSets);
     });
   }
-
   ReviewSummary _buildSummary(
-    List<Session> sessions,
     List<_WorkingSetRow> sets,
   ) {
-    final totalDuration = sessions.fold<Duration>(
+    final sessionsById = <int, Session>{};
+    for (final row in sets) {
+      sessionsById[row.session.id] = row.session;
+    }
+
+    final totalDuration = sessionsById.values.fold<Duration>(
       Duration.zero,
       (sum, session) =>
           sum + session.finishedAt!.difference(session.startedAt),
@@ -199,7 +183,7 @@ class ReviewRepository {
       ..sort((a, b) => b.volume.compareTo(a.volume));
 
     return ReviewSummary(
-      sessionsCompleted: sessions.length,
+      sessionsCompleted: sessionsById.length,
       totalWorkingSets: totalWorkingSets,
       totalVolume: totalVolume,
       totalDuration: totalDuration,
@@ -213,53 +197,10 @@ class _WorkingSetRow {
   const _WorkingSetRow({
     required this.setLog,
     required this.exercise,
+    required this.session,
   });
 
   final SetLog setLog;
   final Exercise exercise;
-}
-
-Stream<T> _combineLatest2<A, B, T>(
-  Stream<A> streamA,
-  Stream<B> streamB,
-  T Function(A a, B b) combiner,
-) {
-  late StreamController<T> controller;
-  StreamSubscription<A>? subscriptionA;
-  StreamSubscription<B>? subscriptionB;
-  A? latestA;
-  B? latestB;
-  var hasA = false;
-  var hasB = false;
-
-  controller = StreamController<T>(
-    onListen: () {
-      subscriptionA = streamA.listen(
-        (value) {
-          latestA = value;
-          hasA = true;
-          if (hasB) {
-            controller.add(combiner(latestA as A, latestB as B));
-          }
-        },
-        onError: controller.addError,
-      );
-      subscriptionB = streamB.listen(
-        (value) {
-          latestB = value;
-          hasB = true;
-          if (hasA) {
-            controller.add(combiner(latestA as A, latestB as B));
-          }
-        },
-        onError: controller.addError,
-      );
-    },
-    onCancel: () async {
-      await subscriptionA?.cancel();
-      await subscriptionB?.cancel();
-    },
-  );
-
-  return controller.stream;
+  final Session session;
 }

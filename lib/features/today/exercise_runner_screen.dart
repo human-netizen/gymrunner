@@ -83,6 +83,10 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
             }
 
             _ensureCurrentExercise(detail);
+            final activeSession = ref.watch(activeSessionProvider).asData?.value;
+            final isDeloadSession = activeSession?.id ==
+                    detail.sessionExercise.sessionId &&
+                (activeSession?.isDeload ?? false);
 
             final lastPerformanceAsync =
                 ref.watch(lastPerformanceProvider(detail.exercise.id));
@@ -113,12 +117,21 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                 actionBarHeight + 16 + bottomInset,
               ),
               children: [
-                Text(
-                  detail.exercise.name,
-                  style: Theme.of(context)
-                      .textTheme
-                      .displaySmall
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        detail.exercise.name,
+                        style: Theme.of(context)
+                            .textTheme
+                            .displaySmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    if (isDeloadSession)
+                      const Chip(label: Text('Deload')),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text('$targetLabel - $restLabel'),

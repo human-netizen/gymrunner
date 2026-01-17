@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:drift/drift.dart' as drift;
 
 import '../db/app_database.dart';
@@ -178,8 +179,12 @@ class SessionRepository {
   Future<int?> startSessionForWorkoutDayAndSelectExercise({
     required int workoutDayId,
     required int exerciseId,
+    bool isDeload = false,
   }) async {
-    final sessionId = await startSessionForWorkoutDay(workoutDayId);
+    final sessionId = await startSessionForWorkoutDay(
+      workoutDayId,
+      isDeload: isDeload,
+    );
     final sessionExercise = await (_db.select(_db.sessionExercises)
           ..where((tbl) =>
               tbl.sessionId.equals(sessionId) &
@@ -316,7 +321,7 @@ class SessionRepository {
     });
   }
 
-  Stream<List<SessionSummary>> watchRecentSessions({int limit = 30}) {
+  Stream<List<SessionSummary>> watchRecentSessions({int limit = 50}) {
     final query = _db.select(_db.sessions).join([
       drift.leftOuterJoin(
         _db.workoutDays,
@@ -327,6 +332,7 @@ class SessionRepository {
         _db.programs.id.equalsExp(_db.sessions.programId),
       ),
     ]);
+    query.where(_db.sessions.finishedAt.isNotNull());
     query.orderBy([
       drift.OrderingTerm(
         expression: _db.sessions.startedAt,
@@ -365,7 +371,10 @@ class SessionRepository {
     );
   }
 
-  Future<int> startSessionForWorkoutDay(int workoutDayId) async {
+  Future<int> startSessionForWorkoutDay(
+    int workoutDayId, {
+    bool isDeload = false,
+  }) async {
     final settings = await _settingsRepository.ensureSingleRow();
     final programId = settings.activeProgramId;
 
@@ -374,6 +383,7 @@ class SessionRepository {
             SessionsCompanion.insert(
               programId: drift.Value(programId),
               workoutDayId: drift.Value(workoutDayId),
+              isDeload: drift.Value(isDeload),
             ),
           );
 
@@ -415,12 +425,22 @@ class SessionRepository {
           );
         }
 
+        if (isDeload && suggestedWorkingWeightKg != null) {
+          suggestedWorkingWeightKg = roundToNearestStep(
+            suggestedWorkingWeightKg * 0.9,
+          );
+        }
+
+        final setsTarget = isDeload
+            ? max(1, prescription.setsTarget - 1)
+            : prescription.setsTarget;
+
         inserts.add(
           SessionExercisesCompanion.insert(
             sessionId: sessionId,
             exerciseId: prescription.exerciseId,
             orderIndex: prescription.orderIndex,
-            setsTarget: prescription.setsTarget,
+            setsTarget: setsTarget,
             repMin: prescription.repMin,
             repMax: prescription.repMax,
             restSeconds: restSeconds,
