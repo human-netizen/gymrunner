@@ -175,23 +175,6 @@ class _AppShellState extends ConsumerState<AppShell>
     ref
         .read(restNotificationsServiceProvider)
         .setOnNotificationTap(_handleNotificationTap);
-    ref.listen<RestTimerState>(restTimerProvider, (previous, next) {
-      _latestTimerState = next;
-      _handleRestTimerChange(next);
-    });
-    ref.listen<AsyncValue<RestNotificationSettings>>(
-      restNotificationSettingsProvider,
-      (previous, next) {
-        if (next.asData?.value.enabled != true) {
-          _cancelRestNotification();
-          return;
-        }
-        if (_lifecycleState != AppLifecycleState.resumed &&
-            _latestTimerState != null) {
-          _scheduleRestNotification(_latestTimerState!);
-        }
-      },
-    );
   }
 
   @override
@@ -215,6 +198,24 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<RestTimerState>(restTimerProvider, (previous, next) {
+      _latestTimerState = next;
+      _handleRestTimerChange(next);
+    });
+    ref.listen<AsyncValue<RestNotificationSettings>>(
+      restNotificationSettingsProvider,
+      (previous, next) {
+        if (next.asData?.value.enabled != true) {
+          _cancelRestNotification();
+          return;
+        }
+        if (_lifecycleState != AppLifecycleState.resumed &&
+            _latestTimerState != null) {
+          _scheduleRestNotification(_latestTimerState!);
+        }
+      },
+    );
+
     final sessionAsync = ref.watch(activeSessionProvider);
     final hasActiveSession = sessionAsync.asData?.value != null;
     final shouldEnable =

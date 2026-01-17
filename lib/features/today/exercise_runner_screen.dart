@@ -50,14 +50,6 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
         _userEditedReps = true;
       }
     });
-    ref.listen<RestTimerState>(restTimerProvider, (previous, next) {
-      if (previous == null) {
-        return;
-      }
-      if (previous.remainingSeconds > 0 && next.remainingSeconds == 0) {
-        HapticFeedback.mediumImpact();
-      }
-    });
   }
 
   @override
@@ -70,6 +62,15 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<RestTimerState>(restTimerProvider, (previous, next) {
+      if (previous == null) {
+        return;
+      }
+      if (previous.remainingSeconds > 0 && next.remainingSeconds == 0) {
+        HapticFeedback.mediumImpact();
+      }
+    });
+
     final detailAsync =
         ref.watch(sessionExerciseDetailProvider(widget.sessionExerciseId));
     final settings = ref.watch(settingsStreamProvider).asData?.value;
@@ -168,6 +169,10 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                       const Chip(label: Text('Deload')),
                   ],
                 ),
+                if (showExtras) ...[
+                  const SizedBox(height: 12),
+                  ExerciseDemoCard(exercise: detail.exercise),
+                ],
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -200,10 +205,6 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                     ],
                   ),
                 ),
-                if (showExtras) ...[
-                  const SizedBox(height: 12),
-                  ExerciseDemoCard(exercise: detail.exercise),
-                ],
                 const SizedBox(height: 8),
                 Text('$targetLabel - $restLabel'),
                 const SizedBox(height: 8),

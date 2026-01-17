@@ -1,16 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../data/db/app_database.dart';
 import '../services/wger_cache_manager.dart';
-import '../services/wger_client.dart';
+import '../services/wger_repository.dart';
 
 class ExerciseDemoCard extends ConsumerStatefulWidget {
   const ExerciseDemoCard({super.key, required this.exercise});
@@ -28,7 +28,6 @@ class _ExerciseDemoCardState extends ConsumerState<ExerciseDemoCard> {
   String? _error;
   List<WgerVideo> _videos = [];
   List<WgerImage> _images = [];
-  Map<int, WgerLicense> _licenses = {};
   WgerVideo? _selectedVideo;
   WgerImage? _selectedImage;
   VideoPlayerController? _videoController;
@@ -81,7 +80,7 @@ class _ExerciseDemoCardState extends ConsumerState<ExerciseDemoCard> {
       children: [
         Expanded(
           child: Text(
-            'Demo',
+            'Demo (wger)',
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
@@ -118,7 +117,7 @@ class _ExerciseDemoCardState extends ConsumerState<ExerciseDemoCard> {
         const SizedBox(height: 8),
         OutlinedButton(
           onPressed: _openLinkSheet,
-          child: const Text('Link demo (wger)'),
+          child: const Text('Find demo'),
         ),
       ],
     );
@@ -165,10 +164,7 @@ class _ExerciseDemoCardState extends ConsumerState<ExerciseDemoCard> {
             ),
           ),
           const SizedBox(height: 8),
-          _buildAttribution(
-            licenseId: _selectedVideo?.licenseId,
-            licenseAuthor: _selectedVideo?.licenseAuthor,
-          ),
+          _buildAttribution(licenseAuthor: _selectedVideo?.licenseAuthor),
         ],
       );
     }
@@ -208,10 +204,7 @@ class _ExerciseDemoCardState extends ConsumerState<ExerciseDemoCard> {
             ),
           ),
           const SizedBox(height: 8),
-          _buildAttribution(
-            licenseId: _selectedImage?.licenseId,
-            licenseAuthor: _selectedImage?.licenseAuthor,
-          ),
+          _buildAttribution(licenseAuthor: _selectedImage?.licenseAuthor),
         ],
       );
     }
@@ -224,48 +217,25 @@ class _ExerciseDemoCardState extends ConsumerState<ExerciseDemoCard> {
     );
   }
 
-  Widget _buildAttribution({
-    required int? licenseId,
-    required String? licenseAuthor,
-  }) {
-    final license = licenseId == null ? null : _licenses[licenseId];
-    final licenseText = license?.shortName.isNotEmpty == true
-        ? license!.shortName
-        : 'License';
+  Widget _buildAttribution({required String? licenseAuthor}) {
     final authorText = (licenseAuthor == null || licenseAuthor.isEmpty)
         ? 'Unknown'
         : licenseAuthor;
-    final licenseUrl = license?.url ?? '';
 
     return Row(
       children: [
         Expanded(
           child: Text(
-            'Demo: wger | $licenseText | $authorText',
+            'Source: wger | $authorText',
             style: Theme.of(context).textTheme.bodySmall,
           ),
-        ),
-        TextButton(
-          onPressed: licenseUrl.isEmpty
-              ? null
-              : () => _openLicenseUrl(licenseUrl),
-          child: const Text('View license'),
         ),
       ],
     );
   }
 
-  Future<void> _openLicenseUrl(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null) {
-      return;
-    }
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-
   Future<void> _loadLink() async {
-    final prefs = await SharedPreferences.getInstance();
-    final linked = prefs.getInt(_linkKey(widget.exercise.id));
+    final linked = await _readLink(widget.exercise.id);
     if (!mounted) {
       return;
     }
@@ -289,25 +259,22 @@ class _ExerciseDemoCardState extends ConsumerState<ExerciseDemoCard> {
       _error = null;
     });
 
-    final client = ref.read(wgerClientProvider);
     try {
-      final videos = await client.getVideos(linkedId);
-      final images = await client.getImages(linkedId);
-      final licenses = await client.getLicenseMap();
+      final repository = ref.read(wgerRepositoryProvider);
+      final bundle = await repository.loadMediaForExercise(linkedId);
 
       if (!mounted) {
         return;
       }
 
-      _videos = videos;
-      _images = _sortImages(images);
-      _licenses = licenses;
+      _videos = bundle.videos;
+      _images = _sortImages(bundle.images).take(3).toList();
       _imageIndex = 0;
       if (_pageController.hasClients) {
         _pageController.jumpToPage(0);
       }
 
-      final selectedVideo = _selectVideo(videos);
+      final selectedVideo = _selectVideo(_videos);
       _selectedVideo = selectedVideo;
       _selectedImage = _images.isNotEmpty ? _images.first : null;
 
@@ -400,7 +367,7 @@ class _ExerciseDemoCardState extends ConsumerState<ExerciseDemoCard> {
   }
 
   Future<void> _openLinkSheet() async {
-    final selected = await showModalBottomSheet<WgerTranslation>(
+    final selected = await showModalBottomSheet<WgerTranslationIndexItem>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _WgerLinkSheet(
@@ -411,8 +378,7 @@ class _ExerciseDemoCardState extends ConsumerState<ExerciseDemoCard> {
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_linkKey(widget.exercise.id), selected.exerciseId);
+    await _writeLink(widget.exercise.id, selected.exerciseId);
 
     if (!mounted) {
       return;
@@ -425,8 +391,7 @@ class _ExerciseDemoCardState extends ConsumerState<ExerciseDemoCard> {
   }
 
   Future<void> _removeLink() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_linkKey(widget.exercise.id));
+    await _removeLinkFromPrefs(widget.exercise.id);
     _imageTimer?.cancel();
     await _videoController?.dispose();
     if (!mounted) {
@@ -459,7 +424,76 @@ class _ExerciseDemoCardState extends ConsumerState<ExerciseDemoCard> {
     return h264.url.isEmpty ? videos.first : h264;
   }
 
-  String _linkKey(int localExerciseId) =>
+  Future<int?> _readLink(int localExerciseId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_linksKey);
+    if (raw == null) {
+      final legacy = prefs.getInt(_legacyLinkKey(localExerciseId));
+      if (legacy != null) {
+        await _writeLink(localExerciseId, legacy);
+        await prefs.remove(_legacyLinkKey(localExerciseId));
+      }
+      return legacy;
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+      final value = decoded['$localExerciseId'];
+      if (value is int) {
+        return value;
+      }
+      final parsed = int.tryParse(value.toString());
+      if (parsed == null) {
+        final legacy = prefs.getInt(_legacyLinkKey(localExerciseId));
+        if (legacy != null) {
+          await _writeLink(localExerciseId, legacy);
+          await prefs.remove(_legacyLinkKey(localExerciseId));
+        }
+        return legacy;
+      }
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _writeLink(int localExerciseId, int wgerExerciseId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_linksKey);
+    final map = <String, dynamic>{};
+    if (raw != null) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) {
+          map.addAll(decoded);
+        }
+      } catch (_) {}
+    }
+    map['$localExerciseId'] = wgerExerciseId;
+    await prefs.setString(_linksKey, jsonEncode(map));
+  }
+
+  Future<void> _removeLinkFromPrefs(int localExerciseId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_linksKey);
+    if (raw == null) {
+      await prefs.remove(_legacyLinkKey(localExerciseId));
+      return;
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        decoded.remove('$localExerciseId');
+        await prefs.setString(_linksKey, jsonEncode(decoded));
+      }
+    } catch (_) {}
+    await prefs.remove(_legacyLinkKey(localExerciseId));
+  }
+
+  static const String _linksKey = 'wger_links_map';
+  String _legacyLinkKey(int localExerciseId) =>
       'wger_link_$localExerciseId';
 }
 
@@ -477,15 +511,20 @@ class _WgerLinkSheet extends ConsumerStatefulWidget {
 class _WgerLinkSheetState extends ConsumerState<_WgerLinkSheet> {
   final TextEditingController _controller = TextEditingController();
   Timer? _debounce;
-  List<WgerTranslation> _results = [];
-  bool _loading = false;
+  List<WgerTranslationIndexItem> _index = [];
+  List<WgerTranslationIndexItem> _results = [];
+  List<String> _suggestions = [];
+  bool _loadingIndex = false;
+  bool _indexReady = false;
+  int? _currentPage;
+  int? _totalPages;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _controller.text = widget.exerciseName;
-    _search(widget.exerciseName);
+    _loadIndex();
   }
 
   @override
@@ -497,6 +536,7 @@ class _WgerLinkSheetState extends ConsumerState<_WgerLinkSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final queryEmpty = _controller.text.trim().isEmpty;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         16,
@@ -515,68 +555,178 @@ class _WgerLinkSheetState extends ConsumerState<_WgerLinkSheet> {
             onChanged: _search,
           ),
           const SizedBox(height: 12),
-          if (_loading)
-            const LinearProgressIndicator(),
-          if (_error != null)
+          if (_loadingIndex)
+            Text(
+              _currentPage == null || _totalPages == null
+                  ? 'Preparing exercise library...'
+                  : 'Preparing exercise library... ($_currentPage/$_totalPages pages)',
+            ),
+          if (_error != null) ...[
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(_error!),
             ),
-          if (!_loading && _results.isEmpty)
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: _loadIndex,
+              child: const Text('Retry'),
+            ),
+          ],
+          if (_indexReady && _results.isEmpty && queryEmpty)
             const Padding(
               padding: EdgeInsets.only(top: 16),
-              child: Text('No results yet. Try another search.'),
+              child: Text('Type to search.'),
             ),
-          SizedBox(
-            height: 320,
-            child: ListView.separated(
-              itemCount: _results.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final item = _results[index];
-                return ListTile(
-                  title: Text(item.name),
-                  subtitle: Text('wger ID: ${item.exerciseId}'),
-                  onTap: () => Navigator.of(context).pop(item),
-                );
-              },
+          if (_indexReady &&
+              _results.isEmpty &&
+              _suggestions.isNotEmpty &&
+              !queryEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Try: ${_suggestions.join(' / ')}',
+                ),
+              ),
             ),
-          ),
+          if (_indexReady &&
+              _results.isEmpty &&
+              _suggestions.isEmpty &&
+              !queryEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 16),
+              child: Text('No results. Try another search.'),
+            ),
+          if (_results.isNotEmpty)
+            SizedBox(
+              height: 320,
+              child: ListView.separated(
+                itemCount: _results.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final item = _results[index];
+                  return ListTile(
+                    title: Text(item.name),
+                    subtitle: Text('wger ID: ${item.exerciseId}'),
+                    onTap: () => Navigator.of(context).pop(item),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
   }
 
+  Future<void> _loadIndex() async {
+    _debounce?.cancel();
+    setState(() {
+      _loadingIndex = true;
+      _error = null;
+      _indexReady = false;
+      _currentPage = null;
+      _totalPages = null;
+    });
+    try {
+      final repository = ref.read(wgerRepositoryProvider);
+      final items = await repository.loadTranslationIndex(
+        onProgress: (current, total) {
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _currentPage = current;
+            _totalPages = total;
+          });
+        },
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _index = _coerceIndexItems(items);
+        _indexReady = true;
+      });
+      _search(_controller.text);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = error.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingIndex = false;
+        });
+      }
+    }
+  }
+
   void _search(String query) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () async {
-      final client = ref.read(wgerClientProvider);
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
-      try {
-        final results = await client.searchTranslations(query);
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _results = results;
-        });
-      } catch (error) {
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _error = 'Search failed. Check your connection.';
-        });
-      } finally {
-        if (mounted) {
-          setState(() {
-            _loading = false;
-          });
-        }
+    _debounce = Timer(const Duration(milliseconds: 200), () {
+      if (!_indexReady) {
+        return;
       }
+      if (query.trim().isEmpty) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _results = [];
+          _suggestions = [];
+        });
+        return;
+      }
+      final repository = ref.read(wgerRepositoryProvider);
+      final output = repository.searchIndex(_index, query);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _results = _coerceIndexItems(output.results);
+        _suggestions = output.suggestions;
+      });
     });
+  }
+
+  List<WgerTranslationIndexItem> _coerceIndexItems(
+    Iterable<dynamic> rawItems,
+  ) {
+    final output = <WgerTranslationIndexItem>[];
+    for (final item in rawItems) {
+      if (item is WgerTranslationIndexItem) {
+        output.add(item);
+        continue;
+      }
+      if (item is Map) {
+        try {
+          output.add(
+            WgerTranslationIndexItem.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          );
+        } catch (_) {}
+        continue;
+      }
+      try {
+        final id = (item as dynamic).id as int;
+        final name = (item as dynamic).name?.toString() ?? '';
+        final exerciseId = (item as dynamic).exerciseId as int;
+        output.add(
+          WgerTranslationIndexItem(
+            id: id,
+            name: name,
+            exerciseId: exerciseId,
+          ),
+        );
+      } catch (_) {
+        // Skip unknown item shape.
+      }
+    }
+    return output;
   }
 }
