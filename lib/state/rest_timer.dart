@@ -1,0 +1,101 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class RestTimerState {
+  const RestTimerState({
+    required this.initialSeconds,
+    required this.remainingSeconds,
+    required this.isRunning,
+  });
+
+  final int initialSeconds;
+  final int remainingSeconds;
+  final bool isRunning;
+
+  RestTimerState copyWith({
+    int? initialSeconds,
+    int? remainingSeconds,
+    bool? isRunning,
+  }) {
+    return RestTimerState(
+      initialSeconds: initialSeconds ?? this.initialSeconds,
+      remainingSeconds: remainingSeconds ?? this.remainingSeconds,
+      isRunning: isRunning ?? this.isRunning,
+    );
+  }
+}
+
+class RestTimerNotifier extends Notifier<RestTimerState> {
+  @override
+  RestTimerState build() {
+    ref.onDispose(() => _timer?.cancel());
+    return const RestTimerState(
+      initialSeconds: 0,
+      remainingSeconds: 0,
+      isRunning: false,
+    );
+  }
+
+  Timer? _timer;
+
+  void start(int seconds) {
+    if (seconds <= 0) {
+      return;
+    }
+    _timer?.cancel();
+    state = RestTimerState(
+      initialSeconds: seconds,
+      remainingSeconds: seconds,
+      isRunning: true,
+    );
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  void _tick() {
+    final nextRemaining = state.remainingSeconds - 1;
+    if (nextRemaining <= 0) {
+      _timer?.cancel();
+      state = state.copyWith(remainingSeconds: 0, isRunning: false);
+      return;
+    }
+    state = state.copyWith(remainingSeconds: nextRemaining);
+  }
+
+  void togglePause() {
+    if (state.isRunning) {
+      _timer?.cancel();
+      state = state.copyWith(isRunning: false);
+      return;
+    }
+
+    if (state.remainingSeconds <= 0) {
+      return;
+    }
+    _timer?.cancel();
+    state = state.copyWith(isRunning: true);
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  void reset() {
+    _timer?.cancel();
+    state = state.copyWith(
+      remainingSeconds: state.initialSeconds,
+      isRunning: false,
+    );
+  }
+
+  void addSeconds(int seconds) {
+    if (seconds <= 0) {
+      return;
+    }
+    state = state.copyWith(
+      initialSeconds: state.initialSeconds + seconds,
+      remainingSeconds: state.remainingSeconds + seconds,
+    );
+  }
+}
+
+final restTimerProvider = NotifierProvider<RestTimerNotifier, RestTimerState>(
+  RestTimerNotifier.new,
+);
