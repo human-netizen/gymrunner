@@ -603,7 +603,8 @@ class _WgerLinkSheetState extends ConsumerState<_WgerLinkSheet> {
               height: 320,
               child: ListView.separated(
                 itemCount: _results.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (context, index) =>
+                    const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final item = _results[index];
                   return ListTile(
@@ -706,7 +707,7 @@ class _WgerLinkSheetState extends ConsumerState<_WgerLinkSheet> {
         try {
           output.add(
             WgerTranslationIndexItem.fromJson(
-              Map<String, dynamic>.from(item as Map),
+              Map<String, dynamic>.from(item),
             ),
           );
         } catch (_) {}

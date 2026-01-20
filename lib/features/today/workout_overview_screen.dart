@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/weekday_labels.dart';
+import '../../data/db/app_database.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/session_repository.dart';
+import '../../services/mentzer_cycle_service.dart';
 import '../../state/rest_timer.dart';
 
 class WorkoutOverviewScreen extends ConsumerWidget {
@@ -21,6 +23,15 @@ class WorkoutOverviewScreen extends ConsumerWidget {
     final dayAsync = workoutDayId == null
         ? const AsyncValue.data(null)
         : ref.watch(workoutDayProvider(workoutDayId));
+    final mentzerService = ref.watch(mentzerCycleServiceProvider);
+    final programAsync = session.programId == null
+        ? const AsyncValue.data(null)
+        : ref.watch(programProvider(session.programId!));
+    final isMentzer = programAsync.asData?.value != null &&
+        mentzerService.isMentzerProgramName(
+          programAsync.asData!.value!.name,
+        );
+    final day = dayAsync.asData?.value;
 
     final resumeId = session.currentSessionExerciseId;
     final canResume = resumeId != null &&
@@ -46,10 +57,10 @@ class WorkoutOverviewScreen extends ConsumerWidget {
             if (day == null) {
               return Text('Workout session', style: textTheme.titleLarge);
             }
-            return Text(
-              '${weekdayLabel(day.weekday)} - ${day.name}',
-              style: textTheme.titleLarge,
-            );
+            final title = isMentzer
+                ? day.name
+                : '${weekdayLabel(day.weekday)} - ${day.name}';
+            return Text(title, style: textTheme.titleLarge);
           },
           loading: () => const Text('Loading day...'),
           error: (error, stack) =>
@@ -120,7 +131,13 @@ class WorkoutOverviewScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         FilledButton(
-          onPressed: () => _finishWorkout(context, ref, session.id),
+          onPressed: () => _finishWorkout(
+            context,
+            ref,
+            session,
+            isMentzer: isMentzer,
+            workoutIndex: day?.orderIndex,
+          ),
           child: const Text('Finish Workout'),
         ),
         const SizedBox(height: 8),
@@ -160,7 +177,10 @@ class WorkoutOverviewScreen extends ConsumerWidget {
   Future<void> _finishWorkout(
     BuildContext context,
     WidgetRef ref,
-    int sessionId,
+    Session session, {
+    required bool isMentzer,
+    required int? workoutIndex,
+  }
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -184,8 +204,20 @@ class WorkoutOverviewScreen extends ConsumerWidget {
       return;
     }
 
-    await ref.read(sessionRepositoryProvider).finishSession(sessionId);
+    final finishedAt = DateTime.now();
+    await ref.read(sessionRepositoryProvider).finishSession(session.id);
     ref.read(restTimerProvider.notifier).reset();
+
+    if (isMentzer &&
+        session.programId != null &&
+        workoutIndex != null) {
+      await ref.read(mentzerCycleServiceProvider).advanceAfterSession(
+            programId: session.programId!,
+            workoutIndex: workoutIndex,
+            finishedAt: finishedAt,
+          );
+      ref.invalidate(mentzerCycleStateProvider(session.programId!));
+    }
   }
 }
 

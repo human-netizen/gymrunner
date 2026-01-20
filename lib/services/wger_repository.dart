@@ -29,7 +29,7 @@ class WgerRepository {
           downloadTranslationIndex(
             languageId: languageId,
             onProgress: null,
-          ).catchError((_) {}),
+          ).catchError((_) => <WgerTranslationIndexItem>[]),
         );
       }
       return cached.items

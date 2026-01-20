@@ -42,6 +42,7 @@ void main() {
                 totalDuration: Duration.zero,
                 muscleSummary: [],
                 exerciseHighlights: [],
+                topE1rmSets: [],
               ),
             ),
           ),

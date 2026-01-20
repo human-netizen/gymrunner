@@ -157,6 +157,9 @@ class BackupManagerScreen extends ConsumerWidget {
     if (confirmed != true) {
       return;
     }
+    if (!context.mounted) {
+      return;
+    }
 
     try {
       final passphrase = await _resolvePassphraseIfNeeded(
@@ -173,8 +176,14 @@ class BackupManagerScreen extends ConsumerWidget {
             backup.file,
             passphraseIfNeeded: passphrase,
           );
+      if (!context.mounted) {
+        return;
+      }
       _invalidateAfterRestore(context, ref);
     } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
       final message = error.toString().contains('Wrong passphrase')
           ? 'Wrong passphrase.'
           : 'Restore failed: $error';
@@ -211,6 +220,9 @@ class BackupManagerScreen extends ConsumerWidget {
     }
 
     await ref.read(backupProServiceProvider).deleteBackup(backup.file);
+    if (!context.mounted) {
+      return;
+    }
     ref.invalidate(localBackupsProvider);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Backup deleted.')),
@@ -229,6 +241,9 @@ class BackupManagerScreen extends ConsumerWidget {
         await ref.read(backupProServiceProvider).readStoredPassphrase();
     if (stored != null && stored.isNotEmpty) {
       return stored;
+    }
+    if (!context.mounted) {
+      return null;
     }
     return _promptPassphrase(context);
   }

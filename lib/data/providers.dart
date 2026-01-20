@@ -8,6 +8,7 @@ import 'repositories/program_repository.dart';
 import 'repositories/review_repository.dart';
 import 'repositories/session_repository.dart';
 import 'repositories/settings_repository.dart';
+import '../services/mentzer_cycle_service.dart';
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   final db = ref.read(appDatabaseProvider);
@@ -187,4 +188,10 @@ final reviewSummaryProvider =
     StreamProvider.family<ReviewSummary, ReviewRange>((ref, range) {
   final repository = ref.watch(reviewRepositoryProvider);
   return repository.watchReviewSummary(range.start, range.end);
+});
+
+final mentzerCycleStateProvider =
+    FutureProvider.family<MentzerCycleState, int>((ref, programId) {
+  final service = ref.read(mentzerCycleServiceProvider);
+  return service.loadCycleState(programId);
 });

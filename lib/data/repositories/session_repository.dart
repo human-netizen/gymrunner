@@ -529,13 +529,17 @@ class SessionRepository {
     int sessionExerciseId,
     double weightKg,
     int reps,
-    {bool isWarmup = false}
+    {
+      bool isWarmup = false,
+      double? rpe,
+    }
   ) async {
     await addSetReturningLog(
       sessionExerciseId,
       weightKg,
       reps,
       isWarmup: isWarmup,
+      rpe: rpe,
     );
   }
 
@@ -544,6 +548,7 @@ class SessionRepository {
     double weightKg,
     int reps, {
     bool isWarmup = false,
+    double? rpe,
   }) async {
     final now = DateTime.now();
     late int insertedId;
@@ -568,6 +573,7 @@ class SessionRepository {
               weightKg: weightKg,
               reps: reps,
               isWarmup: drift.Value(isWarmup),
+              rpe: drift.Value(rpe),
               createdAt: drift.Value(now),
             ),
           );
@@ -599,7 +605,7 @@ class SessionRepository {
       weightKg: weightKg,
       reps: reps,
       isWarmup: isWarmup,
-      rpe: null,
+      rpe: rpe,
       createdAt: now,
     );
   }
@@ -632,11 +638,13 @@ class SessionRepository {
     required int id,
     required double weightKg,
     required int reps,
+    double? rpe,
   }) async {
     await (_db.update(_db.setLogs)..where((tbl) => tbl.id.equals(id))).write(
       SetLogsCompanion(
         weightKg: drift.Value(weightKg),
         reps: drift.Value(reps),
+        rpe: drift.Value(rpe),
       ),
     );
   }

@@ -45,16 +45,20 @@ class SessionShareService {
       if (warmups.isNotEmpty) {
         buffer.writeln('Warmup:');
         for (final set in warmups) {
+          final rpeText =
+              set.rpe == null ? '' : ' (RPE ${_formatRpe(set.rpe!)})';
           buffer.writeln(
-            '- ${_formatWeight(set.weightKg)} x ${set.reps}',
+            '- ${_formatWeight(set.weightKg)} x ${set.reps}$rpeText',
           );
         }
       }
       if (workingSets.isNotEmpty) {
         buffer.writeln('Working sets:');
         for (final set in workingSets) {
+          final rpeText =
+              set.rpe == null ? '' : ' (RPE ${_formatRpe(set.rpe!)})';
           buffer.writeln(
-            '- ${_formatWeight(set.weightKg)} x ${set.reps}',
+            '- ${_formatWeight(set.weightKg)} x ${set.reps}$rpeText',
           );
         }
       }
@@ -172,6 +176,13 @@ class SessionShareService {
   }
 
   String _formatWeight(double value) {
+    if (value % 1 == 0) {
+      return value.toStringAsFixed(0);
+    }
+    return value.toStringAsFixed(1);
+  }
+
+  String _formatRpe(double value) {
     if (value % 1 == 0) {
       return value.toStringAsFixed(0);
     }

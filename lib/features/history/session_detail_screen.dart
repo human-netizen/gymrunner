@@ -147,27 +147,6 @@ class _ExerciseSummaryCard extends StatelessWidget {
             if (warmupSets.isEmpty && workingSets.isEmpty)
               const Text('No sets logged.')
             else ...[
-              if (warmupSets.isNotEmpty) ...[
-                Text(
-                  'Warm-up',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 4),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: warmupSets
-                      .map(
-                        (set) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Text(
-                            'Warm-up ${set.setIndex}: ${set.weightKg.toStringAsFixed(1)} x ${set.reps}',
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: 8),
-              ],
               if (workingSets.isNotEmpty) ...[
                 Text(
                   'Working sets',
@@ -181,7 +160,8 @@ class _ExerciseSummaryCard extends StatelessWidget {
                         (set) => Padding(
                           padding: const EdgeInsets.symmetric(vertical: 2),
                           child: Text(
-                            'Set ${set.setIndex}: ${set.weightKg.toStringAsFixed(1)} x ${set.reps}',
+                            'Set ${set.setIndex}: ${set.weightKg.toStringAsFixed(1)} x ${set.reps}'
+                            '${set.rpe == null ? '' : ' • RPE ${_formatRpe(set.rpe!)}'}',
                           ),
                         ),
                       )
@@ -193,5 +173,12 @@ class _ExerciseSummaryCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatRpe(double value) {
+    if (value % 1 == 0) {
+      return value.toStringAsFixed(0);
+    }
+    return value.toStringAsFixed(1);
   }
 }

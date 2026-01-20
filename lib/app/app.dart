@@ -6,6 +6,7 @@ import 'router.dart';
 import 'theme.dart';
 import '../data/seed/seed_service.dart';
 import '../services/backup_pro_service.dart';
+import '../services/theme_mode_service.dart';
 
 class GymRunnerApp extends ConsumerStatefulWidget {
   const GymRunnerApp({super.key});
@@ -32,9 +33,12 @@ class _GymRunnerAppState extends ConsumerState<GymRunnerApp> {
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
       title: 'Gym Runner',
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
       routerConfig: AppRouter.router,
     );
   }

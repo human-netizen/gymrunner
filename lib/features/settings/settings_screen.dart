@@ -10,6 +10,7 @@ import '../../data/providers.dart';
 import '../../services/backup_pro_service.dart';
 import '../../services/export_service.dart';
 import '../../services/rest_notifications_service.dart';
+import '../../services/theme_mode_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -41,6 +42,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final textTheme = Theme.of(context).textTheme;
     final settingsAsync = ref.watch(settingsStreamProvider);
     final restSettingsAsync = ref.watch(restNotificationSettingsProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return SafeArea(
       child: Padding(
@@ -101,26 +103,81 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: const Text('Advanced'),
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Plates',
+                          style: textTheme.titleLarge,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          plateCsv == null
+                              ? 'Current: --'
+                              : 'Current: $plateCsv',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _plateController,
+                        decoration: const InputDecoration(
+                          labelText: 'Plate inventory (kg per side)',
+                          hintText: '20,15,10,5,2.5,1.25',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton(
+                          onPressed:
+                              settings == null ? null : _savePlateInventory,
+                          child: const Text('Save Plates'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
                   Text(
-                    'Plates',
+                    'Appearance',
                     style: textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    plateCsv == null ? 'Current: --' : 'Current: $plateCsv',
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _plateController,
-                    decoration: const InputDecoration(
-                      labelText: 'Plate inventory (kg per side)',
-                      hintText: '20,15,10,5,2.5,1.25',
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Theme'),
+                    subtitle: Text(_themeLabel(themeMode)),
+                    trailing: DropdownButton<ThemeMode>(
+                      value: themeMode,
+                      onChanged: (value) {
+                        if (value == null) {
+                          return;
+                        }
+                        ref
+                            .read(themeModeProvider.notifier)
+                            .setThemeMode(value);
+                      },
+                      items: const [
+                        DropdownMenuItem(
+                          value: ThemeMode.system,
+                          child: Text('System'),
+                        ),
+                        DropdownMenuItem(
+                          value: ThemeMode.light,
+                          child: Text('Light'),
+                        ),
+                        DropdownMenuItem(
+                          value: ThemeMode.dark,
+                          child: Text('Dark'),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: settings == null ? null : _savePlateInventory,
-                    child: const Text('Save Plates'),
                   ),
                   const SizedBox(height: 24),
                   Text(
@@ -377,6 +434,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (filePath == null) {
       return;
     }
+    if (!mounted) {
+      return;
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -590,6 +650,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
     final start = startOfWeek.subtract(const Duration(days: 28));
     return _DateRange(start: start, end: now);
+  }
+
+  String _themeLabel(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Light mode';
+      case ThemeMode.dark:
+        return 'Dark mode';
+      case ThemeMode.system:
+        return 'Follow system setting';
+    }
   }
 
   void _invalidateAfterRestore() {

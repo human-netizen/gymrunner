@@ -1,28 +1,43 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../db/app_database.dart';
 import '../providers.dart';
 import '../repositories/settings_repository.dart';
+import '../../services/mentzer_cycle_service.dart';
 
 final seedServiceProvider = Provider<SeedService>((ref) {
   final db = ref.read(appDatabaseProvider);
   final settingsRepository = ref.read(settingsRepositoryProvider);
-  return SeedService(db, settingsRepository);
+  final mentzerService = ref.read(mentzerCycleServiceProvider);
+  return SeedService(db, settingsRepository, mentzerService);
 });
 
 class SeedService {
-  SeedService(this._db, this._settingsRepository);
+  SeedService(this._db, this._settingsRepository, this._mentzerService);
 
   final AppDatabase _db;
   final SettingsRepository _settingsRepository;
+  final MentzerCycleService _mentzerService;
 
   Future<void> seedIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final mentzerId =
+        await _mentzerService.ensureMentzerProgram(setActive: false);
+    final didSetMentzerActive =
+        prefs.getBool('mentzer_default_active_set') ?? false;
+    if (!didSetMentzerActive) {
+      await _settingsRepository.setActiveProgram(mentzerId);
+      await prefs.setBool('mentzer_default_active_set', true);
+    }
+
     final settings = await _settingsRepository.ensureSingleRow();
     final programs = await (_db.select(_db.programs)..limit(1)).get();
 
     if (programs.isEmpty) {
-      await _seedDefaultProgram();
+      await _seedDefaultProgram(setActive: false);
       return;
     }
 
@@ -39,7 +54,7 @@ class SeedService {
     }
   }
 
-  Future<void> _seedDefaultProgram() async {
+  Future<void> _seedDefaultProgram({bool setActive = true}) async {
     final exerciseIds = <String, int>{};
     for (final exercise in _seedExercises) {
       final id = await _ensureExercise(exercise);
@@ -80,7 +95,9 @@ class SeedService {
       }
     }
 
-    await _settingsRepository.setActiveProgram(programId);
+    if (setActive) {
+      await _settingsRepository.setActiveProgram(programId);
+    }
   }
 
   Future<int> _ensureExercise(_SeedExercise exercise) async {
