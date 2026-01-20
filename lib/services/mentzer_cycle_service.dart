@@ -17,10 +17,12 @@ class MentzerCycleState {
   const MentzerCycleState({
     required this.nextWorkoutIndex,
     required this.nextAvailableAt,
+    required this.lastFinishedAt,
   });
 
   final int nextWorkoutIndex;
   final DateTime? nextAvailableAt;
+  final DateTime? lastFinishedAt;
 }
 
 class MentzerCycleService {
@@ -31,6 +33,17 @@ class MentzerCycleService {
 
   bool isMentzerProgramName(String name) =>
       name == mentzerHitCycleTemplate.name;
+
+  Future<bool> isMentzerProgramId(int programId) async {
+    final program = await (_db.select(_db.programs)
+          ..where((tbl) => tbl.id.equals(programId))
+          ..limit(1))
+        .getSingleOrNull();
+    if (program == null) {
+      return false;
+    }
+    return isMentzerProgramName(program.name);
+  }
 
   Future<int> ensureMentzerProgram({
     bool setActive = false,
@@ -163,11 +176,39 @@ class MentzerCycleService {
     final prefs = await SharedPreferences.getInstance();
     final index = prefs.getInt(_indexKey(programId)) ?? 0;
     final millis = prefs.getInt(_nextAvailableAtKey(programId));
+    final finishedMillis = prefs.getInt(_lastFinishedAtKey(programId));
     return MentzerCycleState(
       nextWorkoutIndex: index,
       nextAvailableAt:
           millis == null ? null : DateTime.fromMillisecondsSinceEpoch(millis),
+      lastFinishedAt: finishedMillis == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(finishedMillis),
     );
+  }
+
+  Future<void> persistCycleState(
+    int programId,
+    MentzerCycleState state,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_indexKey(programId), state.nextWorkoutIndex);
+    if (state.nextAvailableAt != null) {
+      await prefs.setInt(
+        _nextAvailableAtKey(programId),
+        state.nextAvailableAt!.millisecondsSinceEpoch,
+      );
+    } else {
+      await prefs.remove(_nextAvailableAtKey(programId));
+    }
+    if (state.lastFinishedAt != null) {
+      await prefs.setInt(
+        _lastFinishedAtKey(programId),
+        state.lastFinishedAt!.millisecondsSinceEpoch,
+      );
+    } else {
+      await prefs.remove(_lastFinishedAtKey(programId));
+    }
   }
 
   Future<void> advanceAfterSession({
@@ -185,12 +226,17 @@ class MentzerCycleService {
       _nextAvailableAtKey(programId),
       nextAvailable.millisecondsSinceEpoch,
     );
+    await prefs.setInt(
+      _lastFinishedAtKey(programId),
+      finishedAt.millisecondsSinceEpoch,
+    );
   }
 
   Future<void> resetCycle(int programId) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_indexKey(programId));
     await prefs.remove(_nextAvailableAtKey(programId));
+    await prefs.remove(_lastFinishedAtKey(programId));
   }
 
   Future<int?> workoutIndexForDay(int workoutDayId) async {
@@ -242,4 +288,6 @@ class MentzerCycleService {
       'mentzer_cycle_next_index_$programId';
   String _nextAvailableAtKey(int programId) =>
       'mentzer_cycle_next_available_$programId';
+  String _lastFinishedAtKey(int programId) =>
+      'mentzer_cycle_last_finished_$programId';
 }

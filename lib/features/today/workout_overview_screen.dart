@@ -31,7 +31,6 @@ class WorkoutOverviewScreen extends ConsumerWidget {
         mentzerService.isMentzerProgramName(
           programAsync.asData!.value!.name,
         );
-    final day = dayAsync.asData?.value;
 
     final resumeId = session.currentSessionExerciseId;
     final canResume = resumeId != null &&
@@ -135,8 +134,6 @@ class WorkoutOverviewScreen extends ConsumerWidget {
             context,
             ref,
             session,
-            isMentzer: isMentzer,
-            workoutIndex: day?.orderIndex,
           ),
           child: const Text('Finish Workout'),
         ),
@@ -177,10 +174,7 @@ class WorkoutOverviewScreen extends ConsumerWidget {
   Future<void> _finishWorkout(
     BuildContext context,
     WidgetRef ref,
-    Session session, {
-    required bool isMentzer,
-    required int? workoutIndex,
-  }
+    Session session,
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -208,16 +202,49 @@ class WorkoutOverviewScreen extends ConsumerWidget {
     await ref.read(sessionRepositoryProvider).finishSession(session.id);
     ref.read(restTimerProvider.notifier).reset();
 
-    if (isMentzer &&
-        session.programId != null &&
-        workoutIndex != null) {
-      await ref.read(mentzerCycleServiceProvider).advanceAfterSession(
-            programId: session.programId!,
-            workoutIndex: workoutIndex,
-            finishedAt: finishedAt,
+    if (session.programId != null) {
+      final mentzerService = ref.read(mentzerCycleServiceProvider);
+      final isMentzerProgram =
+          await mentzerService.isMentzerProgramId(session.programId!);
+      if (isMentzerProgram) {
+        final notifier =
+            ref.read(mentzerCycleStateProvider(session.programId!).notifier);
+        int? workoutIndex = notifier.activeWorkoutIndex;
+        if (workoutIndex == null && session.workoutDayId != null) {
+          workoutIndex =
+              await mentzerService.workoutIndexForDay(session.workoutDayId!);
+        }
+        if (workoutIndex == null) {
+          final cycle = await ref
+              .read(mentzerCycleStateProvider(session.programId!).future);
+          workoutIndex = cycle.nextWorkoutIndex;
+        }
+        final nextState = await notifier.advanceAfterFinish(
+          finishedWorkoutIndex: workoutIndex,
+          finishedAt: finishedAt,
+        );
+        if (context.mounted) {
+          final nextLabel = nextState.nextWorkoutIndex + 1;
+          final remaining = nextState.nextAvailableAt == null
+              ? Duration.zero
+              : nextState.nextAvailableAt!.difference(DateTime.now());
+          final remainingLabel = _formatRemaining(
+            remaining.isNegative ? Duration.zero : remaining,
           );
-      ref.invalidate(mentzerCycleStateProvider(session.programId!));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Finished W${workoutIndex + 1} → Next W$nextLabel '
+                '(available in $remainingLabel)',
+              ),
+            ),
+          );
+        }
+      }
     }
+
+    ref.invalidate(activeSessionProvider);
+    ref.invalidate(activeSessionBundleProvider);
   }
 }
 
@@ -253,4 +280,10 @@ class _StatusChip extends StatelessWidget {
       labelStyle: TextStyle(color: foreground),
     );
   }
+}
+
+String _formatRemaining(Duration remaining) {
+  final hours = remaining.inHours;
+  final minutes = remaining.inMinutes.remainder(60);
+  return '${hours}h ${minutes}m';
 }

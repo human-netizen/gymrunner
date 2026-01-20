@@ -9,6 +9,7 @@ import 'repositories/review_repository.dart';
 import 'repositories/session_repository.dart';
 import 'repositories/settings_repository.dart';
 import '../services/mentzer_cycle_service.dart';
+import '../state/mentzer_cycle_notifier.dart';
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   final db = ref.read(appDatabaseProvider);
@@ -191,7 +192,6 @@ final reviewSummaryProvider =
 });
 
 final mentzerCycleStateProvider =
-    FutureProvider.family<MentzerCycleState, int>((ref, programId) {
-  final service = ref.read(mentzerCycleServiceProvider);
-  return service.loadCycleState(programId);
-});
+    AsyncNotifierProvider.family<MentzerCycleNotifier, MentzerCycleState, int>(
+  MentzerCycleNotifier.new,
+);

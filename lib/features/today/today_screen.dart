@@ -273,8 +273,6 @@ class _MentzerTodayPlan extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final cycleAsync = ref.watch(mentzerCycleStateProvider(programId));
     final daysAsync = ref.watch(workoutDaysProvider(programId));
-    final now = DateTime.now();
-
     return cycleAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stack) => const Center(
@@ -306,9 +304,15 @@ class _MentzerTodayPlan extends ConsumerWidget {
             final nextWorkout =
                 mentzerHitCycleTemplate.workoutForIndex(workoutIndex);
             final nextAvailableAt = cycle.nextAvailableAt;
-            final isResting = nextAvailableAt != null &&
-                now.isBefore(nextAvailableAt);
-            final remaining = nextAvailableAt?.difference(now);
+            final lastFinishedAt = cycle.lastFinishedAt;
+            final remaining = nextAvailableAt == null
+                ? Duration.zero
+                : nextAvailableAt.difference(DateTime.now());
+            final clampedRemaining =
+                remaining.isNegative ? Duration.zero : remaining;
+            final isResting = clampedRemaining > Duration.zero;
+            final totalRest =
+                Duration(days: mentzerHitCycleTemplate.restMinDays);
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,16 +325,14 @@ class _MentzerTodayPlan extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(programName, style: textTheme.titleLarge),
-                const SizedBox(height: 12),
-                if (isResting) ...[
-                  Text('Rest day', style: textTheme.titleMedium),
-                  const SizedBox(height: 4),
-                  if (remaining != null)
-                    Text(
-                      'Next workout available in ${remaining.inDays + 1} day(s).',
-                    ),
-                ],
-                const SizedBox(height: 12),
+                if (lastFinishedAt != null) ...[
+                  const SizedBox(height: 12),
+                  _RestBanner(
+                    totalRest: totalRest,
+                    nextAvailableAt: nextAvailableAt,
+                  ),
+                ] else
+                  const SizedBox(height: 12),
                 Text(nextWorkout.title, style: textTheme.titleLarge),
                 const SizedBox(height: 4),
                 Text(mentzerSnippet(nextWorkout.sideNotes)),
@@ -352,22 +354,37 @@ class _MentzerTodayPlan extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                if (isResting)
+                FilledButton(
+                  onPressed: isResting
+                      ? null
+                      : () => _startMentzerWorkout(
+                            context,
+                            ref,
+                            nextDay.id,
+                            workoutIndex: workoutIndex,
+                            programId: programId,
+                          ),
+                  child: isResting
+                      ? Text(
+                          'Available in ${_formatRemaining(clampedRemaining)}',
+                        )
+                      : const Text('Start Workout'),
+                ),
+                if (isResting) ...[
+                  const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: () => _startMentzerWorkout(
                       context,
                       ref,
                       nextDay.id,
                       warn: true,
+                      remaining: clampedRemaining,
+                      workoutIndex: workoutIndex,
+                      programId: programId,
                     ),
                     child: const Text('Start anyway'),
-                  )
-                else
-                  FilledButton(
-                    onPressed: () =>
-                        _startMentzerWorkout(context, ref, nextDay.id),
-                    child: const Text('Start Workout'),
                   ),
+                ],
               ],
             );
           },
@@ -381,15 +398,19 @@ class _MentzerTodayPlan extends ConsumerWidget {
     WidgetRef ref,
     int workoutDayId, {
     bool warn = false,
+    Duration? remaining,
+    required int workoutIndex,
+    required int programId,
   }) async {
     if (warn) {
+      final remainingLabel = remaining == null
+          ? 'You still have rest remaining. Start anyway?'
+          : 'You still have ${_formatRemaining(remaining)} rest remaining. Start anyway?';
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Start early?'),
-          content: const Text(
-            'Mentzer HIT recommends resting 4–7 days. Start anyway?',
-          ),
+          content: Text(remainingLabel),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -407,10 +428,70 @@ class _MentzerTodayPlan extends ConsumerWidget {
       }
     }
 
+    ref
+        .read(mentzerCycleStateProvider(programId).notifier)
+        .setActiveWorkoutIndex(workoutIndex);
     await ref
         .read(sessionRepositoryProvider)
         .startSessionForWorkoutDay(workoutDayId, isDeload: false);
   }
+}
+
+class _RestBanner extends StatelessWidget {
+  const _RestBanner({
+    required this.totalRest,
+    required this.nextAvailableAt,
+  });
+
+  final Duration totalRest;
+  final DateTime? nextAvailableAt;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: Stream.periodic(const Duration(seconds: 1), (value) => value),
+      builder: (context, snapshot) {
+        final now = DateTime.now();
+        final remaining = nextAvailableAt == null
+            ? Duration.zero
+            : nextAvailableAt!.difference(now);
+        final clamped =
+            remaining.isNegative ? Duration.zero : remaining;
+        final totalSeconds = totalRest.inSeconds;
+        final remainingSeconds = clamped.inSeconds;
+        final progress = totalSeconds == 0
+            ? 1.0
+            : 1.0 - (remainingSeconds / totalSeconds);
+        final ready = remainingSeconds == 0;
+        final label = ready
+            ? 'Rest complete: Ready'
+            : 'Rest remaining: ${_formatRemaining(clamped)} / ${totalRest.inHours}h';
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(value: progress.clamp(0.0, 1.0)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+String _formatRemaining(Duration remaining) {
+  final hours = remaining.inHours;
+  final minutes = remaining.inMinutes.remainder(60);
+  return '${hours}h ${minutes}m';
 }
 
 class _StatusPanel extends StatelessWidget {
