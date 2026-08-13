@@ -9,7 +9,9 @@ import 'repositories/review_repository.dart';
 import 'repositories/session_repository.dart';
 import 'repositories/settings_repository.dart';
 import '../services/mentzer_cycle_service.dart';
+import '../services/media_pack_service.dart';
 import '../state/mentzer_cycle_notifier.dart';
+import '../media/gif_resolver.dart';
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   final db = ref.read(appDatabaseProvider);
@@ -36,6 +38,32 @@ final exerciseAnalyticsRepositoryProvider =
 final prescriptionRepositoryProvider = Provider<PrescriptionRepository>((ref) {
   final db = ref.read(appDatabaseProvider);
   return PrescriptionRepository(db);
+});
+
+final mediaPackServiceProvider = Provider<MediaPackService>((ref) {
+  return MediaPackService();
+});
+
+final mediaPackInstalledProvider = FutureProvider<bool>((ref) async {
+  final service = ref.read(mediaPackServiceProvider);
+  return service.isInstalled();
+});
+
+final mediaPackFilesProvider = FutureProvider<List<String>>((ref) async {
+  final service = ref.read(mediaPackServiceProvider);
+  if (!await service.isInstalled()) {
+    return [];
+  }
+  return service.listGifFiles();
+});
+
+final mediaPackIndexProvider = FutureProvider<Map<String, String>>((ref) async {
+  final service = ref.read(mediaPackServiceProvider);
+  if (!await service.isInstalled()) {
+    return {};
+  }
+  final files = await service.listGifFiles();
+  return buildFullPackIndex(files);
 });
 
 final sessionRepositoryProvider = Provider<SessionRepository>((ref) {

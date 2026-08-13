@@ -38,6 +38,7 @@ class Exercises extends Table {
   IntColumn get defaultRestSeconds => integer().withDefault(const Constant(90))();
   RealColumn get defaultIncrementKg =>
       real().withDefault(const Constant(2.5))();
+  TextColumn get gifAssetPath => text().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
 }
@@ -154,7 +155,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -214,6 +215,12 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(settings, settings.backupAutoEnabled);
             await m.addColumn(settings, settings.backupEncryptionEnabled);
             await m.addColumn(settings, settings.lastAutoBackupAt);
+          }
+          if (from < 9) {
+            await m.addColumn(
+              exercises,
+              exercises.gifAssetPath as GeneratedColumn,
+            );
           }
         },
       );

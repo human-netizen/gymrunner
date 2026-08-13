@@ -26,6 +26,7 @@ class SeedService {
 
     final mentzerId =
         await _mentzerService.ensureMentzerProgram(setActive: false);
+    await _mentzerService.backfillMentzerGifPaths();
     final didSetMentzerActive =
         prefs.getBool('mentzer_default_active_set') ?? false;
     if (!didSetMentzerActive) {

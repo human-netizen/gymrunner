@@ -22,6 +22,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final TextEditingController _plateController = TextEditingController();
   bool _plateInitialized = false;
+  bool _mediaPackInstalling = false;
+  double _mediaPackProgress = 0;
 
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final settingsAsync = ref.watch(settingsStreamProvider);
     final restSettingsAsync = ref.watch(restNotificationSettingsProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final mediaPackInstalledAsync = ref.watch(mediaPackInstalledProvider);
 
     return SafeArea(
       child: Padding(
@@ -60,6 +63,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             final encryptionEnabled =
                 settings?.backupEncryptionEnabled ?? false;
             final restSettings = restSettingsAsync.asData?.value;
+            final mediaPackInstalled =
+                mediaPackInstalledAsync.asData?.value ?? false;
 
             return SingleChildScrollView(
               child: Column(
@@ -253,6 +258,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text(
+                    'Demo Media Pack',
+                    style: textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    mediaPackInstalled
+                        ? 'Installed (full pack available)'
+                        : 'Not installed (core pack only)',
+                  ),
+                  if (_mediaPackInstalling)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: LinearProgressIndicator(
+                        value: _mediaPackProgress == 0
+                            ? null
+                            : _mediaPackProgress,
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed:
+                        _mediaPackInstalling ? null : _installMediaPack,
+                    icon: const Icon(Icons.download),
+                    label: Text(
+                      mediaPackInstalled ? 'Reinstall Media Pack' : 'Install Media Pack',
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
                     'Export',
                     style: textTheme.titleLarge,
                   ),
@@ -418,6 +452,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Backup failed: $error')),
       );
+    }
+  }
+
+  Future<void> _installMediaPack() async {
+    setState(() {
+      _mediaPackInstalling = true;
+      _mediaPackProgress = 0;
+    });
+
+    try {
+      await ref.read(mediaPackServiceProvider).installPack(
+            onProgress: (progress) {
+              if (!mounted) {
+                return;
+              }
+              setState(() {
+                _mediaPackProgress = progress;
+              });
+            },
+          );
+      ref.invalidate(mediaPackInstalledProvider);
+      ref.invalidate(mediaPackFilesProvider);
+      ref.invalidate(mediaPackIndexProvider);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Media pack installed.')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Install failed: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _mediaPackInstalling = false;
+        });
+      }
     }
   }
 

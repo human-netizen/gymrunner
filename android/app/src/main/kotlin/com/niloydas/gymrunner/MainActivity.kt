@@ -1,4 +1,4 @@
-package com.example.gym_runner
+package com.niloydas.gymrunner
 
 import io.flutter.embedding.android.FlutterActivity
 

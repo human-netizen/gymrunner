@@ -873,6 +873,17 @@ class $ExercisesTable extends Exercises
         requiredDuringInsert: false,
         defaultValue: const Constant(2.5),
       );
+  static const VerificationMeta _gifAssetPathMeta = const VerificationMeta(
+    'gifAssetPath',
+  );
+  @override
+  late final GeneratedColumn<String> gifAssetPath = GeneratedColumn<String>(
+    'gif_asset_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -893,6 +904,7 @@ class $ExercisesTable extends Exercises
     secondaryMuscles,
     defaultRestSeconds,
     defaultIncrementKg,
+    gifAssetPath,
     createdAt,
   ];
   @override
@@ -956,6 +968,15 @@ class $ExercisesTable extends Exercises
         ),
       );
     }
+    if (data.containsKey('gif_asset_path')) {
+      context.handle(
+        _gifAssetPathMeta,
+        gifAssetPath.isAcceptableOrUnknown(
+          data['gif_asset_path']!,
+          _gifAssetPathMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -995,6 +1016,10 @@ class $ExercisesTable extends Exercises
         DriftSqlType.double,
         data['${effectivePrefix}default_increment_kg'],
       )!,
+      gifAssetPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}gif_asset_path'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1015,6 +1040,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
   final String secondaryMuscles;
   final int defaultRestSeconds;
   final double defaultIncrementKg;
+  final String? gifAssetPath;
   final DateTime createdAt;
   const Exercise({
     required this.id,
@@ -1023,6 +1049,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     required this.secondaryMuscles,
     required this.defaultRestSeconds,
     required this.defaultIncrementKg,
+    this.gifAssetPath,
     required this.createdAt,
   });
   @override
@@ -1034,6 +1061,9 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     map['secondary_muscles'] = Variable<String>(secondaryMuscles);
     map['default_rest_seconds'] = Variable<int>(defaultRestSeconds);
     map['default_increment_kg'] = Variable<double>(defaultIncrementKg);
+    if (!nullToAbsent || gifAssetPath != null) {
+      map['gif_asset_path'] = Variable<String>(gifAssetPath);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -1046,6 +1076,9 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       secondaryMuscles: Value(secondaryMuscles),
       defaultRestSeconds: Value(defaultRestSeconds),
       defaultIncrementKg: Value(defaultIncrementKg),
+      gifAssetPath: gifAssetPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(gifAssetPath),
       createdAt: Value(createdAt),
     );
   }
@@ -1064,6 +1097,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       defaultIncrementKg: serializer.fromJson<double>(
         json['defaultIncrementKg'],
       ),
+      gifAssetPath: serializer.fromJson<String?>(json['gifAssetPath']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -1077,6 +1111,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       'secondaryMuscles': serializer.toJson<String>(secondaryMuscles),
       'defaultRestSeconds': serializer.toJson<int>(defaultRestSeconds),
       'defaultIncrementKg': serializer.toJson<double>(defaultIncrementKg),
+      'gifAssetPath': serializer.toJson<String?>(gifAssetPath),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -1088,6 +1123,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     String? secondaryMuscles,
     int? defaultRestSeconds,
     double? defaultIncrementKg,
+    Value<String?> gifAssetPath = const Value.absent(),
     DateTime? createdAt,
   }) => Exercise(
     id: id ?? this.id,
@@ -1096,6 +1132,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     secondaryMuscles: secondaryMuscles ?? this.secondaryMuscles,
     defaultRestSeconds: defaultRestSeconds ?? this.defaultRestSeconds,
     defaultIncrementKg: defaultIncrementKg ?? this.defaultIncrementKg,
+    gifAssetPath: gifAssetPath.present ? gifAssetPath.value : this.gifAssetPath,
     createdAt: createdAt ?? this.createdAt,
   );
   Exercise copyWithCompanion(ExercisesCompanion data) {
@@ -1114,6 +1151,9 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       defaultIncrementKg: data.defaultIncrementKg.present
           ? data.defaultIncrementKg.value
           : this.defaultIncrementKg,
+      gifAssetPath: data.gifAssetPath.present
+          ? data.gifAssetPath.value
+          : this.gifAssetPath,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -1127,6 +1167,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
           ..write('secondaryMuscles: $secondaryMuscles, ')
           ..write('defaultRestSeconds: $defaultRestSeconds, ')
           ..write('defaultIncrementKg: $defaultIncrementKg, ')
+          ..write('gifAssetPath: $gifAssetPath, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -1140,6 +1181,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     secondaryMuscles,
     defaultRestSeconds,
     defaultIncrementKg,
+    gifAssetPath,
     createdAt,
   );
   @override
@@ -1152,6 +1194,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
           other.secondaryMuscles == this.secondaryMuscles &&
           other.defaultRestSeconds == this.defaultRestSeconds &&
           other.defaultIncrementKg == this.defaultIncrementKg &&
+          other.gifAssetPath == this.gifAssetPath &&
           other.createdAt == this.createdAt);
 }
 
@@ -1162,6 +1205,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
   final Value<String> secondaryMuscles;
   final Value<int> defaultRestSeconds;
   final Value<double> defaultIncrementKg;
+  final Value<String?> gifAssetPath;
   final Value<DateTime> createdAt;
   const ExercisesCompanion({
     this.id = const Value.absent(),
@@ -1170,6 +1214,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     this.secondaryMuscles = const Value.absent(),
     this.defaultRestSeconds = const Value.absent(),
     this.defaultIncrementKg = const Value.absent(),
+    this.gifAssetPath = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   ExercisesCompanion.insert({
@@ -1179,6 +1224,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     this.secondaryMuscles = const Value.absent(),
     this.defaultRestSeconds = const Value.absent(),
     this.defaultIncrementKg = const Value.absent(),
+    this.gifAssetPath = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : name = Value(name),
        primaryMuscle = Value(primaryMuscle);
@@ -1189,6 +1235,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     Expression<String>? secondaryMuscles,
     Expression<int>? defaultRestSeconds,
     Expression<double>? defaultIncrementKg,
+    Expression<String>? gifAssetPath,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -1200,6 +1247,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
         'default_rest_seconds': defaultRestSeconds,
       if (defaultIncrementKg != null)
         'default_increment_kg': defaultIncrementKg,
+      if (gifAssetPath != null) 'gif_asset_path': gifAssetPath,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -1211,6 +1259,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     Value<String>? secondaryMuscles,
     Value<int>? defaultRestSeconds,
     Value<double>? defaultIncrementKg,
+    Value<String?>? gifAssetPath,
     Value<DateTime>? createdAt,
   }) {
     return ExercisesCompanion(
@@ -1220,6 +1269,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
       secondaryMuscles: secondaryMuscles ?? this.secondaryMuscles,
       defaultRestSeconds: defaultRestSeconds ?? this.defaultRestSeconds,
       defaultIncrementKg: defaultIncrementKg ?? this.defaultIncrementKg,
+      gifAssetPath: gifAssetPath ?? this.gifAssetPath,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -1245,6 +1295,9 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     if (defaultIncrementKg.present) {
       map['default_increment_kg'] = Variable<double>(defaultIncrementKg.value);
     }
+    if (gifAssetPath.present) {
+      map['gif_asset_path'] = Variable<String>(gifAssetPath.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1260,6 +1313,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
           ..write('secondaryMuscles: $secondaryMuscles, ')
           ..write('defaultRestSeconds: $defaultRestSeconds, ')
           ..write('defaultIncrementKg: $defaultIncrementKg, ')
+          ..write('gifAssetPath: $gifAssetPath, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -5280,6 +5334,7 @@ typedef $$ExercisesTableCreateCompanionBuilder =
       Value<String> secondaryMuscles,
       Value<int> defaultRestSeconds,
       Value<double> defaultIncrementKg,
+      Value<String?> gifAssetPath,
       Value<DateTime> createdAt,
     });
 typedef $$ExercisesTableUpdateCompanionBuilder =
@@ -5290,6 +5345,7 @@ typedef $$ExercisesTableUpdateCompanionBuilder =
       Value<String> secondaryMuscles,
       Value<int> defaultRestSeconds,
       Value<double> defaultIncrementKg,
+      Value<String?> gifAssetPath,
       Value<DateTime> createdAt,
     });
 
@@ -5378,6 +5434,11 @@ class $$ExercisesTableFilterComposer
 
   ColumnFilters<double> get defaultIncrementKg => $composableBuilder(
     column: $table.defaultIncrementKg,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get gifAssetPath => $composableBuilder(
+    column: $table.gifAssetPath,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5476,6 +5537,11 @@ class $$ExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get gifAssetPath => $composableBuilder(
+    column: $table.gifAssetPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -5514,6 +5580,11 @@ class $$ExercisesTableAnnotationComposer
 
   GeneratedColumn<double> get defaultIncrementKg => $composableBuilder(
     column: $table.defaultIncrementKg,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get gifAssetPath => $composableBuilder(
+    column: $table.gifAssetPath,
     builder: (column) => column,
   );
 
@@ -5608,6 +5679,7 @@ class $$ExercisesTableTableManager
                 Value<String> secondaryMuscles = const Value.absent(),
                 Value<int> defaultRestSeconds = const Value.absent(),
                 Value<double> defaultIncrementKg = const Value.absent(),
+                Value<String?> gifAssetPath = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => ExercisesCompanion(
                 id: id,
@@ -5616,6 +5688,7 @@ class $$ExercisesTableTableManager
                 secondaryMuscles: secondaryMuscles,
                 defaultRestSeconds: defaultRestSeconds,
                 defaultIncrementKg: defaultIncrementKg,
+                gifAssetPath: gifAssetPath,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -5626,6 +5699,7 @@ class $$ExercisesTableTableManager
                 Value<String> secondaryMuscles = const Value.absent(),
                 Value<int> defaultRestSeconds = const Value.absent(),
                 Value<double> defaultIncrementKg = const Value.absent(),
+                Value<String?> gifAssetPath = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => ExercisesCompanion.insert(
                 id: id,
@@ -5634,6 +5708,7 @@ class $$ExercisesTableTableManager
                 secondaryMuscles: secondaryMuscles,
                 defaultRestSeconds: defaultRestSeconds,
                 defaultIncrementKg: defaultIncrementKg,
+                gifAssetPath: gifAssetPath,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0

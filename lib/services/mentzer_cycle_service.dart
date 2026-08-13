@@ -6,6 +6,7 @@ import '../data/db/app_database.dart';
 import '../data/providers.dart';
 import '../data/repositories/settings_repository.dart';
 import '../templates/mentzer_hit_cycle.dart';
+import '../media/gif_resolver.dart';
 
 final mentzerCycleServiceProvider = Provider<MentzerCycleService>((ref) {
   final db = ref.read(appDatabaseProvider);
@@ -264,6 +265,7 @@ class MentzerCycleService {
         final existingId = existingByName[key];
         if (existingId != null) {
           idsByName[item.name] = existingId;
+          await _ensureGifPath(existingId, item.name);
           continue;
         }
 
@@ -273,6 +275,7 @@ class MentzerCycleService {
                 primaryMuscle: item.primaryMuscle,
                 defaultRestSeconds: const drift.Value(120),
                 defaultIncrementKg: const drift.Value(2.5),
+                gifAssetPath: drift.Value(_gifPathForName(item.name)),
               ),
             );
 
@@ -282,6 +285,38 @@ class MentzerCycleService {
     }
 
     return idsByName;
+  }
+
+  Future<void> _ensureGifPath(int exerciseId, String name) async {
+    final gifPath = _gifPathForName(name);
+    if (gifPath == null) {
+      return;
+    }
+    await (_db.update(_db.exercises)..where((tbl) => tbl.id.equals(exerciseId)))
+        .write(
+      ExercisesCompanion(gifAssetPath: drift.Value(gifPath)),
+    );
+  }
+
+  String? _gifPathForName(String name) => lookupMentzerGif(name);
+
+  Future<void> backfillMentzerGifPaths() async {
+    final exercises = await _db.select(_db.exercises).get();
+    for (final exercise in exercises) {
+      if (exercise.gifAssetPath != null &&
+          exercise.gifAssetPath!.isNotEmpty) {
+        continue;
+      }
+      final gifPath = _gifPathForName(exercise.name);
+      if (gifPath == null) {
+        continue;
+      }
+      await (_db.update(_db.exercises)
+            ..where((tbl) => tbl.id.equals(exercise.id)))
+          .write(
+        ExercisesCompanion(gifAssetPath: drift.Value(gifPath)),
+      );
+    }
   }
 
   String _indexKey(int programId) =>

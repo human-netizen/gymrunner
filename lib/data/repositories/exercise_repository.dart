@@ -60,4 +60,14 @@ class ExerciseRepository {
   Future<void> deleteExercise(int id) async {
     await (_db.delete(_db.exercises)..where((tbl) => tbl.id.equals(id))).go();
   }
+
+  Future<void> updateGifAssetPath(int id, String? gifAssetPath) async {
+    await (_db.update(_db.exercises)..where((tbl) => tbl.id.equals(id))).write(
+      ExercisesCompanion(
+        gifAssetPath: gifAssetPath == null
+            ? const drift.Value.absent()
+            : drift.Value(gifAssetPath),
+      ),
+    );
+  }
 }

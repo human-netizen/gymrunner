@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../services/mentzer_cycle_service.dart';
+import '../../media/gif_resolver.dart';
 import '../../state/rest_timer.dart';
 
 class ExerciseRunnerScreen extends ConsumerStatefulWidget {
@@ -73,6 +76,7 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
     final detailAsync =
         ref.watch(sessionExerciseDetailProvider(widget.sessionExerciseId));
     final settings = ref.watch(settingsStreamProvider).asData?.value;
+    final fullPackIndex = ref.watch(mediaPackIndexProvider).asData?.value;
     final defaultWeight = settings?.barWeightKg ?? 20.0;
     final timerState = ref.watch(restTimerProvider);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -134,6 +138,7 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                   workoutIndex: workoutIndex,
                   exerciseName: detail.exercise.name,
                 );
+            final storedGifPath = detail.exercise.gifAssetPath;
 
             _maybePrefill(detail, defaultWeight);
 
@@ -203,6 +208,51 @@ class _ExerciseRunnerScreenState extends ConsumerState<ExerciseRunnerScreen> {
                     ),
                   ),
                 ],
+                FutureBuilder<ResolvedGif?>(
+                  future: resolveGif(
+                    exerciseName: detail.exercise.name,
+                    storedPath: storedGifPath,
+                    fullPackIndex: fullPackIndex,
+                  ),
+                  builder: (context, snapshot) {
+                    final resolved = snapshot.data;
+                    if (resolved == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxWidth: 180,
+                                maxHeight: 180,
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: resolved.isAsset
+                                    ? Image.asset(
+                                        resolved.path,
+                                        fit: BoxFit.cover,
+                                        gaplessPlayback: true,
+                                        filterQuality: FilterQuality.none,
+                                      )
+                                    : Image.file(
+                                        File(resolved.path),
+                                        fit: BoxFit.cover,
+                                        gaplessPlayback: true,
+                                        filterQuality: FilterQuality.none,
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'Logged sets',

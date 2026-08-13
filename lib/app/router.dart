@@ -19,7 +19,10 @@ import '../features/programs/day_detail_screen.dart';
 import '../features/programs/exercise_library_screen.dart';
 import '../features/programs/exercise_picker_screen.dart';
 import '../features/programs/prescription_edit_screen.dart';
-import '../features/review/review_screen.dart';
+import '../features/library/library_root_screen.dart';
+import '../features/library/library_group_screen.dart';
+import '../features/library/exercise_demo_screen.dart';
+import '../features/library/assign_gif_page.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/settings/backup_manager_screen.dart';
 import '../features/today/today_screen.dart';
@@ -128,8 +131,28 @@ class AppRouter {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/review',
-                builder: (context, state) => const ReviewScreen(),
+                path: '/library',
+                builder: (context, state) => const LibraryRootScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'group/:groupKey',
+                    builder: (context, state) => LibraryGroupScreen(
+                      groupKey: state.pathParameters['groupKey'] ?? '',
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'exercise/:exerciseId',
+                    builder: (context, state) => ExerciseDemoScreen(
+                      exerciseId: _intParam(state, 'exerciseId'),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'assign/:exerciseId',
+                    builder: (context, state) => AssignGifPage(
+                      exerciseId: _intParam(state, 'exerciseId'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -252,9 +275,9 @@ class _AppShellState extends ConsumerState<AppShell>
             label: 'History',
           ),
           NavigationDestination(
-            icon: Icon(Icons.insights_outlined),
-            selectedIcon: Icon(Icons.insights),
-            label: 'Review',
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book),
+            label: 'Library',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
