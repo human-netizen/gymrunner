@@ -1,16 +1,35 @@
-# gym_runner
+# Gym Runner
 
-A new Flutter project.
+An offline-first Flutter workout tracker — build programs, run them set by set with a rest timer, and keep your whole training history on-device.
 
-## Getting Started
+## Demo
 
-This project is a starting point for a Flutter application.
+<p align="center">
+  <img src="docs/demo.gif" alt="Logging a set in Gym Runner: pick the exercise, enter weight and reps, and the rest timer starts automatically" width="320">
+</p>
 
-A few resources to get you started if this is your first Flutter project:
+<!-- Full 47s walkthrough with sound: drag docs/demo.mp4 into a new GitHub issue,
+     copy the github.com/user-attachments/assets/... URL it generates, and paste
+     it on its own line below. -->
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Features
+
+- **Today / Runner** — work through a session one exercise at a time, log sets, warm-ups and RPE, with a built-in rest timer and Gym Mode for a distraction-free screen
+- **Programs** — build multi-day programs, set prescriptions per exercise, reuse them week to week
+- **Exercise library** — animated form GIFs for each movement, searchable and linkable to your own exercises
+- **History** — per-session and per-exercise history with estimated 1RM tracking and live PR detection
+- **Plate calculator** — what to load on the bar for any target weight
+- **Backup & restore** — export and reimport your data from Settings
+- **Light / dark / system themes**
+
+## Getting started
+
+```bash
+flutter pub get
+flutter run
+```
+
+Requires Flutter with Dart SDK ^3.10.7.
+
+For building a signed Android release, see [RELEASE_ANDROID.md](RELEASE_ANDROID.md).
