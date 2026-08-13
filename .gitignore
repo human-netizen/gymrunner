@@ -52,3 +52,7 @@ app.*.map.json
 # Demo source video — GitHub can't play repo-hosted video, so only the GIF is
 # committed. Upload docs/demo.mp4 to a GitHub issue/release to get a playable URL.
 /docs/demo.mp4
+
+# Competitive-programming scratch files (unrelated to the app)
+/.cph/
+/*.cpp
