@@ -8,10 +8,9 @@ An offline-first Flutter workout tracker — build programs, run them set by set
   <img src="docs/demo.gif" alt="Logging a set in Gym Runner: pick the exercise, enter weight and reps, and the rest timer starts automatically" width="320">
 </p>
 
-<!-- Full 47s walkthrough with sound: drag docs/demo.mp4 into a new GitHub issue,
-     copy the github.com/user-attachments/assets/... URL it generates, and paste
-     it on its own line below. -->
+Full walkthrough — programs, history, plate calculator and backup/export:
 
+https://github.com/user-attachments/assets/14a91278-05f7-4d68-9165-3e3f61699948
 
 ## Features
 
